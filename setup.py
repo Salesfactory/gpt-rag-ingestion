@@ -476,16 +476,8 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
                 "batchSize":1,
                 "inputs":[ 
                     {
-                        "name":"documentUrl",
-                        "source":"/document/metadata_storage_path"
-                    },
-                    {
                         "name":"documentContent",
                         "source":"/document/content"
-                    },                    
-                    { 
-                        "name":"documentSasToken",
-                        "source":"/document/metadata_storage_sas_token"
                     },
                     { 
                         "name":"documentContentType",
@@ -500,80 +492,6 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
                 ]
             }
         ],
-        "indexProjections": {
-            "selectors": [
-                {
-                    "targetIndexName":"ragindex",
-                    "parentKeyFieldName": "parent_id",
-                    "sourceContext": "/document/chunks/*",
-                    "mappings": [
-                        {
-                        "name": "chunk_id",
-                        "source": "/document/chunks/*/chunk_id",
-                        "inputs": []
-                        },
-                        {
-                            "name": "offset",
-                            "source": "/document/chunks/*/offset",
-                            "inputs": []
-                        },
-                        {
-                            "name": "length",
-                            "source": "/document/chunks/*/length",
-                            "inputs": []
-                        },
-                        {
-                            "name": "page",
-                            "source": "/document/chunks/*/page",
-                            "inputs": []
-                        },
-                        {
-                            "name": "title",
-                            "source": "/document/chunks/*/title",
-                            "inputs": []
-                        },
-                        {
-                            "name": "category",
-                            "source": "/document/chunks/*/category",
-                            "inputs": []
-                        },
-                        {
-                            "name": "url",
-                            "source": "/document/chunks/*/url",
-                            "inputs": []
-                        },
-                        {
-                            "name": "filepath",
-                            "source": "/document/chunks/*/filepath",
-                            "inputs": []
-                        },
-                        {
-                            "name": "content",
-                            "source": "/document/chunks/*/content",
-                            "inputs": []
-                        },
-                        {
-                            "name": "contentVector",
-                            "source": "/document/chunks/*/contentVector",
-                            "inputs": []
-                        },
-                        {
-                            "name": "metadata_storage_path",
-                            "source": "/document/metadata_storage_path",
-                            "inputs": []
-                        },
-                        {
-                            "name": "metadata_storage_name",
-                            "source": "/document/metadata_storage_name",
-                            "inputs": []
-                        }
-                    ]
-                }
-            ],
-            "parameters": {
-                "projectionMode": "skipIndexingParentDocuments"
-            }
-        }
     }
     if azure_search_use_mis:
         body['skills'][0]['uri'] = f"{function_endpoint}/api/document-chunking"
