@@ -127,12 +127,10 @@ def get_request_schema():
                         "data": {
                             "type": "object",
                             "properties": {
-                                "documentUrl": {"type": "string", "minLength": 1}, 
-                                "documentContent": {"type": "string"},                                                                
-                                "documentSasToken": {"type": "string", "minLength": 1},
+                                "documentContent": {"type": "string"},
                                 "documentContentType": {"type": "string", "minLength": 1}
                             },
-                            "required": ["documentContent", "documentUrl", "documentSasToken", "documentContentType"],
+                            "required": ["documentContent", "documentContentType"],
                         },
                     },
                     "required": ["recordId", "data"],
