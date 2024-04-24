@@ -87,93 +87,81 @@ def get_secret(secretName):
 # DOCUMENT INTELLIGENCE FUNCTIONS
 ##########################################################################################
 
-def analyze_document_rest(filepath, model):
+def send_request(url, headers, data=None, json_data=None, is_json=True):
+    retries = 0
+    max_retries = 5
+    backoff_factor = 2
 
+    while retries < max_retries:
+        try:
+            if is_json:
+                response = requests.post(url, headers=headers, json=json_data)
+            else:
+                response = requests.post(url, headers=headers, data=data)
+            response.raise_for_status()
+            return response
+        except requests.exceptions.RequestException as e:
+            logging.info(f"Request error: {e}, retrying in {backoff_factor ** retries} seconds...")
+            time.sleep(backoff_factor ** retries)
+            retries += 1
+    return None
+
+def poll_for_result(get_url, headers):
     result = {}
+    poll_attempts = 0
+    max_poll_attempts = 10
+    headers["Content-Type"] = "application/json-patch+json"
 
-    if get_file_extension(filepath) in ["pdf"]:
-        docint_features = "ocr.highResolution"
-    else:
-        docint_features = ""
+    while poll_attempts < max_poll_attempts:
+        result_response = requests.get(get_url, headers=headers)
+        if result_response.status_code == 200:
+            result_json = result_response.json()
+            if result_json["status"] == "succeeded":
+                result = result_json['analyzeResult']
+                break
+            elif result_json["status"] == "failed":
+                print("Error result: ", result_response.text)
+                break
+        time.sleep(2)
+        poll_attempts += 1
 
-    request_endpoint = f"https://{os.environ['AZURE_FORMREC_SERVICE']}.cognitiveservices.azure.com/{formrec_or_docint}/documentModels/{model}:analyze?api-version={DOCINT_API_VERSION}&features={docint_features}&includeKeys=true"
+    return result
+
+def analyze_document_rest(filepath, model):
+    file_ext = get_file_extension(filepath)
+    docint_features = "ocr.highResolution" if file_ext == "pdf" else ""
+    api_service = os.environ['AZURE_FORMREC_SERVICE']
+    request_endpoint = f"https://{api_service}.cognitiveservices.azure.com/{formrec_or_docint}/documentModels/{model}:analyze?api-version={DOCINT_API_VERSION}&features={docint_features}&includeKeys=true"
+
+    headers = {
+        "Ocp-Apim-Subscription-Key": get_secret('formRecKey'),
+        "x-ms-useragent": "gpt-rag/1.0.0"
+    }
 
     if not network_isolation:
-        headers = {
-            # "Content-Type": "application/json",
-            "Ocp-Apim-Subscription-Key": get_secret('formRecKey'),
-            "x-ms-useragent": "gpt-rag/1.0.0"
-        }
-        body = {
-            "urlSource": filepath
-        }
-        try:
-            # Send request
-            response = requests.post(request_endpoint, headers=headers, json=body)
-        except requests.exceptions.ConnectionError as e:
-            logging.info("Connection error, retrying in 10seconds...")
-            time.sleep(10)
-            response = requests.post(request_endpoint, headers=headers, json=body)
-            
+        response = send_request(request_endpoint, headers, json_data={"urlSource": filepath})
     else:
-
         parsed_url = urlparse(filepath)
-        account_url = parsed_url.scheme + "://" + parsed_url.netloc
-        container_name = parsed_url.path.split("/")[1]
-        blob_name = parsed_url.path.split("/")[2]
-
-        logging.info(f"Conecting to blob to get {blob_name}.")
+        account_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+        container_name = parsed_url.path.split('/')[1]
+        blob_name = parsed_url.path.split('/')[2]
 
         credential = DefaultAzureCredential()
         blob_service_client = BlobServiceClient(account_url=account_url, credential=credential)
         blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
 
-        headers = {
-            # "Content-Type": "application/pdf",
-            "Ocp-Apim-Subscription-Key": get_secret('formRecKey'),
-            "x-ms-useragent": "gpt-rag/1.0.0"
-        }
+        data = blob_client.download_blob().readall()
+        response = send_request(request_endpoint, headers, data=data, is_json=False)
 
-        try:
-            data = blob_client.download_blob().readall()
-            response = requests.post(request_endpoint, headers=headers, data=data)
-        except requests.exceptions.ConnectionError as e:
-            logging.info("Connection error, retrying in 10seconds...")
-            time.sleep(10)
-            data = blob_client.download_blob().readall()            
-            response = requests.post(request_endpoint, headers=headers, data=data)
-
-        
-        logging.info(f"Removed file: {blob_name}.")
-
-    if response.status_code != 202:
-        # Request failed
-        logging.info(f"Doc Intelligence API error: {response.text}")
-        logging.info(f"urlSource: {filepath}")
-        return(result)
+    if not response or response.status_code != 202:
+        logging.error(f"Failed to process document. Status code: {response.status_code if response else 'No response'}")
+        return {}
 
     # Poll for result
     get_url = response.headers["Operation-Location"]
-    result_headers = headers.copy()
-    result_headers["Content-Type"] = "application/json-patch+json"
+    result = poll_for_result(get_url, headers)
 
-    while True:
-        result_response = requests.get(get_url, headers=result_headers)
-        result_json = json.loads(result_response.text)
-
-        if result_response.status_code != 200 or result_json["status"] == "failed":
-            # Request failed
-            print("Error result: ", result_response.text)
-            break
-
-        if result_json["status"] == "succeeded":
-            result = result_json['analyzeResult']
-            break
-
-        # Request still processing, wait and try again
-        time.sleep(2)
-
-    return result 
+    return result
 
 ##########################################################################################
 # CHUNKING FUNCTIONS
