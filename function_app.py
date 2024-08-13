@@ -50,6 +50,7 @@ def format_messages(messages):
 def process_documents(body):
     import json
     import logging
+    import os
     import chunker.chunk_documents_headings
     import chunker.chunk_documents_raw
     import chunker.chunk_documents_headings
@@ -57,7 +58,7 @@ def process_documents(body):
     values = body["values"]
     results = {}
     results["values"] = []
-    use_default_chunking = os.getenv("USE_DEFAULT_CHUNKING", "false").lower() == "true"
+    use_default_chunking = os.getenv("USE_DEFAULT_CHUNKING", "false")
     for value in values:
         # perform operation on each record (document)
         data = value["data"]

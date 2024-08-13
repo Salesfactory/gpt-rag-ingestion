@@ -44,6 +44,9 @@ else:
 
 TOKEN_ESTIMATOR = TokenEstimator()
 
+DOC_INTELLIGENCE_ENDPOINT = os.getenv("DOC_INTELLIGENCE_ENDPOINT")
+DOC_INTELLIGENCE_KEY = os.getenv("DOC_INTELLIGENCE_KEY")
+
 ##########################################################################################
 # UTILITY FUNCTIONS
 ##########################################################################################
@@ -235,8 +238,8 @@ def process_blob_with_sas_url(blob_url):
         # Process the blob with Azure DI using the SAS URL
         loader = AzureAIDocumentIntelligenceLoader(
             url_path=blob_url,
-            api_key=doc_intelligence_key,
-            api_endpoint=doc_intelligence_endpoint,
+            api_key=DOC_INTELLIGENCE_KEY,
+            api_endpoint=DOC_INTELLIGENCE_ENDPOINT,
             api_model="prebuilt-layout",
             mode="markdown",
         )
