@@ -38,7 +38,7 @@ network_isolation = True if NETWORK_ISOLATION.lower() == "true" else False
 FILE_EXTENSION_DICT = ["pdf", "bmp", "jpeg", "png", "tiff"]
 if DOCINT_API_VERSION >= DOCINT_40_API:
     formrec_or_docint = "documentintelligence"
-    FILE_EXTENSION_DICT.extend(["docx", "pptx", "xlsx", "html"])
+    FILE_EXTENSION_DICT.extend(["docx", "pptx", "html"])
 else:
     formrec_or_docint = "formrecognizer"
 
@@ -94,7 +94,8 @@ def get_content_type(file_ext):
         "tiff": "image/tiff",
         "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        #
+        # "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "html": "text/html",
     }
     if file_ext in extensions:

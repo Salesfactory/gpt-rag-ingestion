@@ -63,6 +63,7 @@ def process_documents(body):
     import chunker.chunk_documents_headings
     import chunker.chunk_documents_raw
     import chunker.chunk_documents_headings
+    import chunker.chunk_documents_excel
 
     values = body["values"]
     results = {}
@@ -82,10 +83,12 @@ def process_documents(body):
             "errors": None,
             "warnings": None,
         }
-
+        
         # Execute the new chunking method if environment variable is set
-        if use_default_chunking == "false":
+        if use_default_chunking == "true":
+
             logging.info(f"Chunking {data['documentUrl'].split('/')[-1]}.")
+
             chunks, errors, warnings = chunker.chunk_documents_headings.chunk_document(
                 data
             )
@@ -93,12 +96,20 @@ def process_documents(body):
         elif chunker.chunk_documents_headings.has_supported_file_extension(
             data["documentUrl"]
         ):
+            
             logging.info(
                 f"Chunking (doc intelligence) {data['documentUrl'].split('/')[-1]}."
             )
+            time.sleep(10)
             chunks, errors, warnings = chunker.chunk_documents_headings.chunk_document(
                 data
             )
+
+        elif chunker.chunk_documents_excel.has_supported_file_extension(data['documentUrl']):
+
+            logging.info(f"Chunking (excel) {data['documentUrl'].split('/')[-1]}.")
+            chunks, errors, warnings = chunker.chunk_documents_excel.chunk_document(data)
+            
 
         elif chunker.chunk_documents_raw.has_supported_file_extension(
             data["documentUrl"]
@@ -139,7 +150,8 @@ def process_documents(body):
         if len(errors) > 0:
             output_record["errors"] = format_messages(errors)
 
-        output_record["data"] = {"docintContent": chunks}
+        output_record["data"] = {"Chunk content": chunks}
+        
 
         if output_record != None:
             results["values"].append(output_record)
