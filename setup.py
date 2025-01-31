@@ -437,16 +437,21 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
         "semantic": {
             "configurations": [
                 {
-                    "name": "my-semantic-config",
+                    "name": "semantic-config",
                     "prioritizedFields": {
+                        "prioritizedTitleFields": [
+                            {
+                                "fieldName": "title"
+                            }
+                        ],
                         "prioritizedContentFields": [
                             {
-                                "fieldName": "content"
+                                "fieldName": "chunk"
                             }
                         ],
                         "prioritizedKeywordsFields": [
                             {
-                                "fieldName": "category"
+                                "fieldName": "KeyPhrases"
                             }
                         ]
                     }
