@@ -1144,17 +1144,21 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
         "skills":[ 
             { 
                 "@odata.type":"#Microsoft.Skills.Custom.WebApiSkill",
-                "name":"document-chunking",
-                "description":"Extract chunks from documents.",
-                "httpMethod":"POST",
-                "timeout":"PT230S",
+                "name":"docint-processing",
+                "description":"Process content with document intelligence markdown notation",
                 "context":"/document",
+                "httpMethod":"POST",
+                "timeout":"PT3M50S",
                 "batchSize":1,
                 "inputs":[ 
                     {
                         "name":"documentUrl",
                         "source":"/document/metadata_storage_path"
-                    },                   
+                    },     
+                    {
+                        "name": "documentContent",
+                        "source": "/document/content"
+                    },              
                     { 
                         "name":"documentSasToken",
                         "source":"/document/metadata_storage_sas_token"
@@ -1166,8 +1170,61 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
                 ],
                 "outputs":[ 
                     {
-                        "name":"chunks",
-                        "targetName":"chunks"
+                        "name":"docintContent",
+                        "targetName":"docintContent"
+                    }
+                ]
+            },
+            {
+                "@odata.type": "#Microsoft.Skills.Text.LanguageDetectionSkill",
+                "name": "Lenguage Detection",
+                "description": "Skill to get the language of the document",
+                "context": "/document/docintContent/pages/*",
+                "inputs": [
+                    {
+                        "name": "text",
+                        "source": "/document/docintContent/pages/*",
+                        "inputs": []
+                    }
+                ],
+                "outputs": [
+                    {
+                        "name": "languageCode",
+                        "targetName": "languageCode"
+                    },
+                    {
+                        "name": "languageName",
+                        "targetName": "languageName"
+                    },
+                    {
+                        "name": "score",
+                        "targetName": "score"
+                    }
+                ]
+            },
+            {
+                "@odata.type": "#Microsoft.Skills.Text.KeyPhraseExtractionSkill",
+                "name": "Key Phrase Extraction",
+                "description": "Skill to get the key phrases of the document",
+                "context": "/document/docintContent/pages/*",
+                "defaultLanguageCode": "en",
+                "maxKeyPhraseCount": 10,
+                "inputs": [
+                    {
+                        "name": "text",
+                        "source": "/document/docintContent/pages/*",
+                        "inputs": []
+                    },
+                    {
+                        "name": "languageCode",
+                        "source": "/document/docintContent/pages/*/languageCode",
+                        "inputs": []
+                    }
+                ],
+                "outputs": [
+                    {
+                        "name": "keyPhrases",
+                        "targetName": "keyPhrases"
                     }
                 ]
             }
@@ -1177,81 +1234,36 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
                 {
                     "targetIndexName":f"{search_index_name}",
                     "parentKeyFieldName": "parent_id",
-                    "sourceContext": "/document/chunks/*",
+                    "sourceContext": "/document/docintContent/pages/*",
                     "mappings": [
                         {
-                        "name": "chunk_id",
-                        "source": "/document/chunks/*/chunk_id",
-                        "inputs": []
-                        },
-                        {
-                            "name": "offset",
-                            "source": "/document/chunks/*/offset",
-                            "inputs": []
-                        },
-                        {
-                            "name": "length",
-                            "source": "/document/chunks/*/length",
-                            "inputs": []
-                        },
-                        {
-                            "name": "page",
-                            "source": "/document/chunks/*/page",
-                            "inputs": []
-                        },
-                        {
-                            "name": "title",
-                            "source": "/document/chunks/*/title",
-                            "inputs": []
-                        },
-                        {
-                            "name": "category",
-                            "source": "/document/chunks/*/category",
-                            "inputs": []
-                        },
-                        {
                             "name": "url",
-                            "source": "/document/chunks/*/url",
+                            "source": "/document/docintContent/url",
                             "inputs": []
                         },
                         {
-                            "name": "relatedImages",
-                            "source": "/document/chunks/*/relatedImages",
-                            "inputs": []
-                        },
-                        {
-                            "name": "relatedFiles",
-                            "source": "/document/chunks/*/relatedFiles",
+                            "name": "organization_id",
+                            "source": "/document/organization_id",
                             "inputs": []
                         },
                         {
                             "name": "filepath",
-                            "source": "/document/chunks/*/filepath",
+                            "source": "/document/docintContent/url",
                             "inputs": []
                         },
                         {
                             "name": "content",
-                            "source": "/document/chunks/*/content",
+                            "source": "/document/docintContent/pages/*",
                             "inputs": []
                         },
                         {
-                            "name": "summary",
-                            "source": "/document/chunks/*/summary",
+                            "name": "vector",
+                            "source": "/document/docintContent/pages/*/vector",
                             "inputs": []
                         },
                         {
-                            "name": "source",
-                            "source": "/document/chunks/*/source",
-                            "inputs": []
-                        },                                                      
-                        {
-                            "name": "contentVector",
-                            "source": "/document/chunks/*/contentVector",
-                            "inputs": []
-                        },
-                        {
-                            "name": "metadata_storage_last_modified",
-                            "source": "/document/metadata_storage_last_modified",
+                            "name": "metadata_storage_path",
+                            "source": "/document/metadata_storage_path",
                             "inputs": []
                         },
                         {
@@ -1260,15 +1272,20 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
                             "inputs": []
                         },
                         {
-                            "name": "metadata_storage_path",
-                            "source": "/document/metadata_storage_path",
+                            "name": "keyPhrases",
+                            "source": "/document/docintContent/pages/*/keyPhrases",
                             "inputs": []
-                        },                        
+                        },
                         {
-                            "name": "metadata_security_id", 
-                            "source": "/document/metadata_security_id",
+                            "name": "languageCode",
+                            "source": "/document/docintContent/pages/*/languageCode",
                             "inputs": []
-                        }                         
+                        },
+                        {
+                            "name": "languageName",
+                            "source": "/document/docintContent/pages/*/languageName",
+                            "inputs": []
+                        }                      
                     ]
                 }
             ],
@@ -1287,286 +1304,6 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
     # first delete to enforce web api skillset to be updated
     call_search_api(search_service, search_api_version, "skillsets", f"{search_index_name}-skillset-chunking", "delete", credential)        
     call_search_api(search_service, search_api_version, "skillsets", f"{search_index_name}-skillset-chunking", "put", credential, body)
-
-    # creating skill sets for the NL2SQL indexes
-
-    def create_embedding_skillset(skillset_name, resource_uri, deployment_id, model_name, input_field, output_field, dimensions):
-        skill = {
-            "@odata.type": "#Microsoft.Skills.Text.AzureOpenAIEmbeddingSkill",
-            "name": f"{skillset_name}-embedding-skill",
-            "description": f"Generates embeddings for {input_field}.",
-            "resourceUri": resource_uri,
-            "deploymentId": deployment_id,
-            "modelName": model_name,
-            "dimensions": dimensions,
-            "context":"/document",            
-            "inputs": [
-                {
-                    "name": "text",
-                    "source": f"/document/{input_field}"
-                }
-            ],
-            "outputs": [
-                {
-                    "name": "embedding",
-                    "targetName": output_field
-                }
-            ]
-        }
-
-        skillset_body = {
-            "name": skillset_name,
-            "description": f"Skillset for generating embeddings for {skillset_name} index.",
-            "skills": [skill]
-        }
-
-        return skillset_body
-
-    # Configuration parameters
-    resource_uri = f"https://{azure_openai_service_name}.openai.azure.com/"
-    deployment_id = azure_openai_embedding_deployment  # Example deployment ID
-    model_name = azure_openai_embedding_model
-
-    # Define skillsets configurations
-    skillsets = [
-        {
-            "skillset_name": "queries-skillset",
-            "input_field": "question",
-            "output_field": "contentVector"
-        },
-        {
-            "skillset_name": "tables-skillset",
-            "input_field": "description",
-            "output_field": "contentVector"
-        },
-        {
-            "skillset_name": "columns-skillset",
-            "input_field": "description",
-            "output_field": "contentVector"
-        }
-    ]
-
-    # Iterate and create skillsets
-    for skillset in skillsets:
-        body = create_embedding_skillset(
-            skillset_name=skillset["skillset_name"],
-            resource_uri=resource_uri,
-            deployment_id=deployment_id,
-            model_name=model_name,
-            input_field=skillset["input_field"],
-            output_field=skillset["output_field"],
-            dimensions=azure_embeddings_vector_size
-        )
-
-        # Delete existing skillset if it exists
-        call_search_api(search_service, search_api_version, "skillsets", skillset["skillset_name"], "delete", credential)
-
-        # Create the new skillset
-        call_search_api(search_service, search_api_version, "skillsets", skillset["skillset_name"], "put", credential, body)
-
-        logging.info(f"Skillset '{skillset['skillset_name']}' created successfully.")
-
-
-
-    call_search_api(
-        search_service,
-        search_api_version,
-        "skillsets",
-        f"{search_index_name}-skillset-chunking",
-        "delete",
-        credential,
-    )
-    call_search_api(
-        search_service,
-        search_api_version,
-        "skillsets",
-        f"{search_index_name}-skillset-chunking",
-        "put",
-        credential,
-        body,
-    )
-
-    # creating skill sets for the NL2SQL indexes
-
-    def create_embedding_skillset(
-        skillset_name,
-        resource_uri,
-        deployment_id,
-        model_name,
-        input_field,
-        output_field,
-        dimensions,
-    ):
-        skill = {
-            "@odata.type": "#Microsoft.Skills.Text.AzureOpenAIEmbeddingSkill",
-            "name": f"{skillset_name}-embedding-skill",
-            "description": f"Generates embeddings for {input_field}.",
-            "resourceUri": resource_uri,
-            "deploymentId": deployment_id,
-            "modelName": model_name,
-            "dimensions": dimensions,
-            "context": "/document",
-            "inputs": [{"name": "text", "source": f"/document/{input_field}"}],
-            "outputs": [{"name": "embedding", "targetName": output_field}],
-        }
-
-        skillset_body = {
-            "name": skillset_name,
-            "description": f"Skillset for generating embeddings for {skillset_name} index.",
-            "skills": [skill],
-        }
-
-        return skillset_body
-
-    # Configuration parameters
-    resource_uri = f"https://{azure_openai_service_name}.openai.azure.com/"
-    deployment_id = azure_openai_embedding_deployment  # Example deployment ID
-    model_name = azure_openai_embedding_model
-
-    # Define skillsets configurations
-    skillsets = [
-        {
-            "skillset_name": "queries-skillset",
-            "input_field": "question",
-            "output_field": "contentVector",
-        },
-        {
-            "skillset_name": "tables-skillset",
-            "input_field": "description",
-            "output_field": "contentVector",
-        },
-        {
-            "skillset_name": "columns-skillset",
-            "input_field": "description",
-            "output_field": "contentVector",
-        },
-    ]
-
-    # Iterate and create skillsets
-    for skillset in skillsets:
-        body = create_embedding_skillset(
-            skillset_name=skillset["skillset_name"],
-            resource_uri=resource_uri,
-            deployment_id=deployment_id,
-            model_name=model_name,
-            input_field=skillset["input_field"],
-            output_field=skillset["output_field"],
-            dimensions=azure_embeddings_vector_size,
-        )
-
-        # Delete existing skillset if it exists
-        call_search_api(
-            search_service,
-            search_api_version,
-            "skillsets",
-            skillset["skillset_name"],
-            "delete",
-            credential,
-        )
-
-        # Create the new skillset
-        call_search_api(
-            search_service,
-            search_api_version,
-            "skillsets",
-            skillset["skillset_name"],
-            "put",
-            credential,
-            body,
-        )
-
-        logging.info(f"Skillset '{skillset['skillset_name']}' created successfully.")
-
-    # creating skill sets for the NL2SQL indexes
-
-    def create_embedding_skillset(
-        skillset_name,
-        resource_uri,
-        deployment_id,
-        model_name,
-        input_field,
-        output_field,
-        dimensions,
-    ):
-        skill = {
-            "@odata.type": "#Microsoft.Skills.Text.AzureOpenAIEmbeddingSkill",
-            "name": f"{skillset_name}-embedding-skill",
-            "description": f"Generates embeddings for {input_field}.",
-            "resourceUri": resource_uri,
-            "deploymentId": deployment_id,
-            "modelName": model_name,
-            "dimensions": dimensions,
-            "context": "/document",
-            "inputs": [{"name": "text", "source": f"/document/{input_field}"}],
-            "outputs": [{"name": "embedding", "targetName": output_field}],
-        }
-
-        skillset_body = {
-            "name": skillset_name,
-            "description": f"Skillset for generating embeddings for {skillset_name} index.",
-            "skills": [skill],
-        }
-
-        return skillset_body
-
-    # Configuration parameters
-    resource_uri = f"https://{azure_openai_service_name}.openai.azure.com/"
-    deployment_id = azure_openai_embedding_deployment  # Example deployment ID
-    model_name = azure_openai_embedding_model
-
-    # Define skillsets configurations
-    skillsets = [
-        {
-            "skillset_name": "queries-skillset",
-            "input_field": "question",
-            "output_field": "contentVector",
-        },
-        {
-            "skillset_name": "tables-skillset",
-            "input_field": "description",
-            "output_field": "contentVector",
-        },
-        {
-            "skillset_name": "columns-skillset",
-            "input_field": "description",
-            "output_field": "contentVector",
-        },
-    ]
-
-    # Iterate and create skillsets
-    for skillset in skillsets:
-        body = create_embedding_skillset(
-            skillset_name=skillset["skillset_name"],
-            resource_uri=resource_uri,
-            deployment_id=deployment_id,
-            model_name=model_name,
-            input_field=skillset["input_field"],
-            output_field=skillset["output_field"],
-            dimensions=azure_embeddings_vector_size,
-        )
-
-        # Delete existing skillset if it exists
-        call_search_api(
-            search_service,
-            search_api_version,
-            "skillsets",
-            skillset["skillset_name"],
-            "delete",
-            credential,
-        )
-
-        # Create the new skillset
-        call_search_api(
-            search_service,
-            search_api_version,
-            "skillsets",
-            skillset["skillset_name"],
-            "put",
-            credential,
-            body,
-        )
-
-        logging.info(f"Skillset '{skillset['skillset_name']}' created successfully.")
 
     response_time = time.time() - start_time
     logging.info(f"04 Create skillset step. {round(response_time,2)} seconds")
