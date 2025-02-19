@@ -2,6 +2,7 @@ import logging
 import time
 import os
 import requests
+from typing import Optional
 import argparse
 import json
 from azure.mgmt.web import WebSiteManagementClient
@@ -310,6 +311,72 @@ def approve_search_shared_private_access(subscription_id, resource_group, storag
         logging.error(f"Error when approving private link service connection. Please do it manually. Error: {error_message}")
         raise
 
+def create_indexer_body(indexer_name: str, index_name: str = None):
+            # Azure Cognitive Search settings from .env
+        service_name = os.getenv("AZURE_SEARCH_SERVICE_NAME")
+        api_version = "2024-11-01-preview" 
+        admin_key = os.getenv("AZURE_SEARCH_ADMIN_KEY")
+        indexer_name = f"nam-indexer-chunk-documents"
+        # Endpoint URL
+        endpoint = f"https://{service_name}.search.windows.net/indexers/{indexer_name}?api-version={api_version}"
+        
+        # Headers
+        headers = {
+            'Content-Type': 'application/json',
+            'api-key': admin_key
+        }
+        body = {
+        "name": indexer_name,
+        "dataSourceName": f"{index_name}-datasource",
+        "targetIndexName": f"{index_name}",
+        "skillsetName": f"{index_name}-skillset-chunking",
+        "schedule": {"interval": "P1D"},
+        "fieldMappings": [
+            {
+                "sourceFieldName": "metadata_storage_path",
+                "targetFieldName": "id",
+                "mappingFunction": {
+                    "name": "base64Encode"
+                }
+            },
+            {
+                "sourceFieldName": "organization_id",
+                "targetFieldName": "organization_id",
+                "mappingFunction": None
+            }
+        ],
+        "outputFieldMappings": [],
+        "parameters": {
+            "batchSize": 1,
+            "maxFailedItems": -1,
+            "maxFailedItemsPerBatch": -1,
+            "configuration": {
+                "dataToExtract": "contentAndMetadata",
+                "parsingMode": "default"
+            }
+        }
+    }
+        
+        # First, try to delete the existing indexer if it exists
+        try:
+            delete_response = requests.delete(endpoint, headers=headers)
+            print(f"Delete existing indexer response: {delete_response.status_code}")
+        except Exception as e:
+            print(f"Error deleting existing indexer: {e}")
+        
+        # Create the new indexer
+        try:
+            response = requests.put(endpoint, headers=headers, json=body)
+            
+            if response.status_code in [200, 201]:
+                print("Indexer created successfully!")
+                print(json.dumps(response.json(), indent=2))
+            else:
+                print(f"Error creating indexer. Status code: {response.status_code}")
+                print(f"Error message: {response.text}")
+                
+        except Exception as e:
+            print(f"Error creating indexer: {e}")
 def execute_setup(subscription_id, resource_group, function_app_name, search_principal_id, azure_search_use_mis, enable_managed_identities, enable_env_credentials):
     """
     This function performs the necessary steps to set up the ingestion sub components, such as creating the required datastores and indexers.
@@ -364,7 +431,11 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
     logging.info(f"[execute_setup] Embedding vector size: {azure_embeddings_vector_size}")
     logging.info(f"[execute_setup] Resource group: {resource_group}")  
     logging.info(f"[execute_setup] Storage resource group: {azure_storage_resource_group}") 
-    logging.info(f"[execute_setup] Azure OpenAI resource group: {azure_aoai_resource_group}")        
+    logging.info(f"[execute_setup] Azure OpenAI resource group: {azure_aoai_resource_group}") 
+
+    # local setting 
+    search_index_name = os.getenv("SEARCH_INDEX_NAME")    
+    search_index_interval = os.getenv("SEARCH_INDEX_INTERVAL")
     
 
     ###########################################################################
@@ -960,9 +1031,23 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
     ###########################################################################
     # 05 Creating indexers
     ###########################################################################
-    logging.info("05 Creating indexer step.")
-    start_time = time.time()
-    body = {
+    # create the indexers for the main index
+    def create_indexer_body(indexer_name):
+            # Azure Cognitive Search settings from .env
+        service_name = os.getenv("AZURE_SEARCH_SERVICE_NAME")
+        api_version = "2024-11-01-preview" 
+        admin_key = os.getenv("AZURE_SEARCH_ADMIN_KEY")
+        indexer_name = f"{search_index_name}-indexer-chunk-documents"
+        # Endpoint URL
+        endpoint = f"https://{service_name}.search.windows.net/indexers/{indexer_name}?api-version={api_version}"
+        
+        # Headers
+        headers = {
+            'Content-Type': 'application/json',
+            'api-key': admin_key
+        }
+        body = {
+        "name": indexer_name,
         "dataSourceName": f"{search_index_name}-datasource",
         "targetIndexName": f"{search_index_name}",
         "skillsetName": f"{search_index_name}-skillset-chunking",
@@ -972,8 +1057,13 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
                 "sourceFieldName": "metadata_storage_path",
                 "targetFieldName": "id",
                 "mappingFunction": {
-                    "name": "fixedLengthEncode"
+                    "name": "base64Encode"
                 }
+            },
+            {
+                "sourceFieldName": "organization_id",
+                "targetFieldName": "organization_id",
+                "mappingFunction": None
             }
         ],
         "outputFieldMappings": [],
@@ -981,157 +1071,34 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
             "batchSize": 1,
             "maxFailedItems": -1,
             "maxFailedItemsPerBatch": -1,
-            "base64EncodeKeys": True,
             "configuration": {
-                "dataToExtract": "allMetadata"
+                "dataToExtract": "contentAndMetadata",
+                "parsingMode": "default"
             }
         }
     }
-    if network_isolation: body['parameters']['configuration']['executionEnvironment'] = "private"
-    call_search_api(search_service, search_api_version, "indexers", f"{search_index_name}-indexer-chunk-documents", "put", credential, body)
-
-    # creating indexers for the NL2SQL indexes
-    def create_indexer_body(indexer_name, index_name, data_source_name, skillset_name, field_mappings=None, indexing_parameters=None):
-        body = {
-            "name": indexer_name,
-            "dataSourceName": data_source_name,
-            "targetIndexName": index_name,
-            "skillsetName": skillset_name,
-            "schedule": {
-                "interval": "PT2H"  # Adjust as needed
-            },
-            "fieldMappings": field_mappings if field_mappings else [],
-            "outputFieldMappings": [
-                {
-                    "sourceFieldName": "/document/contentVector",
-                    "targetFieldName": "contentVector"
-                }
-            ],
-            "parameters":
-            {
-                "configuration": {
-                    "parsingMode": "json"
-                }
-            }            
-        }
-        if indexing_parameters:
-            body["parameters"] = indexing_parameters
-        return body
-
-    # Define field mappings for the 'queries-indexer'
-    field_mappings_queries = [
-        {
-            "sourceFieldName" : "metadata_storage_path",
-            "targetFieldName" : "id",
-            "mappingFunction" : {
-                "name" : "fixedLengthEncode"
-            }
-        },      
-        {
-            "sourceFieldName": "question",
-            "targetFieldName": "question"
-        },
-        {
-            "sourceFieldName": "query",
-            "targetFieldName": "query"
-        },
-        {
-            "sourceFieldName": "selected_tables",
-            "targetFieldName": "selected_tables"
-        },
-        {
-            "sourceFieldName": "selected_columns",
-            "targetFieldName": "selected_columns"
-        },
-        {
-            "sourceFieldName": "reasoning",
-            "targetFieldName": "reasoning"
-        }
-    ]
-
-    # Define field mappings for the 'tables-indexer'
-    field_mappings_tables = [
-        {
-            "sourceFieldName" : "metadata_storage_path",
-            "targetFieldName" : "id",
-            "mappingFunction" : {
-                "name" : "fixedLengthEncode"
-            }
-        },      
-        {
-            "sourceFieldName": "table_name",
-            "targetFieldName": "table_name"
-        },
-        {
-            "sourceFieldName": "description",
-            "targetFieldName": "description"
-        }
-    ]
-
-    # Define field mappings for the 'columns-indexer'
-    field_mappings_columns = [
-        {
-            "sourceFieldName" : "metadata_storage_path",
-            "targetFieldName" : "id",
-            "mappingFunction" : {
-                "name" : "fixedLengthEncode"
-            }
-        },
-        {
-            "sourceFieldName": "table_name",
-            "targetFieldName": "table_name"
-        },
-        {
-            "sourceFieldName": "column_name",
-            "targetFieldName": "column_name"
-        },
-        {
-            "sourceFieldName": "description",
-            "targetFieldName": "description"
-        }        
-    ]
-
-
-    # Define indexing parameters for the 'queries-indexer'
-    indexing_parameters = {
-        "configuration": {
-            "parsingMode": "json"
-        }
-    }
-
-    # Define indexers configurations
-    indexers = [
-        {
-            "indexer_name": "queries-indexer",
-            "index_name": f"{search_index_name}",
-            "data_source_name": f"{search_index_name}-datasource",
-            "skillset_name": "queries-skillset",
-            "field_mappings": field_mappings_queries,
-            "indexing_parameters": indexing_parameters
-        }
-    ]
-
-    # Iterate and create indexers
-    for indexer in indexers:
-        body = create_indexer_body(
-            indexer_name=indexer["indexer_name"],
-            index_name=indexer["index_name"],
-            data_source_name=indexer["data_source_name"],
-            skillset_name=indexer["skillset_name"],
-            field_mappings=indexer["field_mappings"]
-        )
-
-
-        # Delete existing indexer if it exists
-        call_search_api(search_service, search_api_version, "indexers", indexer["indexer_name"], "delete", credential)
-
+        # First, try to delete the existing indexer if it exists
+        try:
+            delete_response = requests.delete(endpoint, headers=headers)
+            print(f"Delete existing indexer response: {delete_response.status_code}")
+        except Exception as e:
+            print(f"Error deleting existing indexer: {e}")
+        
         # Create the new indexer
-        call_search_api(search_service, search_api_version, "indexers", indexer["indexer_name"], "put", credential, body)
+        try:
+            response = requests.put(endpoint, headers=headers, json=body)
+            
+            if response.status_code in [200, 201]:
+                print("Indexer created successfully!")
+                print(json.dumps(response.json(), indent=2))
+            else:
+                print(f"Error creating indexer. Status code: {response.status_code}")
+                print(f"Error message: {response.text}")
+                
+        except Exception as e:
+            print(f"Error creating indexer: {e}")
 
-        logging.info(f"Indexer '{indexer['indexer_name']}' created successfully.")
-
-    response_time = time.time() - start_time
-    logging.info(f"05 Create indexers step. {round(response_time,2)} seconds")
+    
 
 def main(subscription_id=None, resource_group=None, function_app_name=None, search_principal_id='', azure_search_use_mis=False, enable_managed_identities=False, enable_env_credentials=False):
     """
@@ -1163,29 +1130,31 @@ def main(subscription_id=None, resource_group=None, function_app_name=None, sear
     logging.info(f"Finished setup. {round(response_time,2)} seconds")
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')    
-    parser = argparse.ArgumentParser(description='Script to do the data ingestion setup for Azure Cognitive Search.')
-    parser.add_argument('-s', '--subscription_id', help='Subscription ID')
-    parser.add_argument('-r', '--resource_group', help='Resource group (Function App)')
-    parser.add_argument('-f', '--function_app_name', help='Chunking function app name')
-    parser.add_argument('-a', '--search_principal_id', default='none', help='Entra ID of the search service')
-    parser.add_argument('-m', '--azure_search_use_mis', help='Use Search Service Managed Identity to Connect to data ingestion function')
-    parser.add_argument('-i', '--enable_managed_identities', action='store_true', default=False, help='Use VM\'s managed identities for the setup')
-    parser.add_argument('-e', '--enable_env_credentials', action='store_true', default=False, help='Use environment credentials for the setup')    
-    args = parser.parse_args()
+    # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')    
+    # parser = argparse.ArgumentParser(description='Script to do the data ingestion setup for Azure Cognitive Search.')
+    # parser.add_argument('-s', '--subscription_id', help='Subscription ID')
+    # parser.add_argument('-r', '--resource_group', help='Resource group (Function App)')
+    # parser.add_argument('-f', '--function_app_name', help='Chunking function app name')
+    # parser.add_argument('-a', '--search_principal_id', default='none', help='Entra ID of the search service')
+    # parser.add_argument('-m', '--azure_search_use_mis', help='Use Search Service Managed Identity to Connect to data ingestion function')
+    # parser.add_argument('-i', '--enable_managed_identities', action='store_true', default=False, help='Use VM\'s managed identities for the setup')
+    # parser.add_argument('-e', '--enable_env_credentials', action='store_true', default=False, help='Use environment credentials for the setup')    
+    # args = parser.parse_args()
 
-    # format search_use_mis to boolean
-    search_use_mis = args.azure_search_use_mis.lower() == "true" if args.azure_search_use_mis not in [None, ""] else False
+    # # format search_use_mis to boolean
+    # search_use_mis = args.azure_search_use_mis.lower() == "true" if args.azure_search_use_mis not in [None, ""] else False
 
-    # Log all arguments
-    logging.info(f"[main] Subscription ID: {args.subscription_id}")
-    logging.info(f"[main] Resource group: {args.resource_group}") 
-    logging.info(f"[main] Function app name: {args.function_app_name}")
-    logging.info(f"[main] Search principal ID: {args.search_principal_id}")
-    logging.info(f"[main] Azure Search use MIS: {search_use_mis}")
-    logging.info(f"[main] Enable managed identities: {args.enable_managed_identities}")
-    logging.info(f"[main] Enable environment credentials: {args.enable_env_credentials}")
+    # # Log all arguments
+    # logging.info(f"[main] Subscription ID: {args.subscription_id}")
+    # logging.info(f"[main] Resource group: {args.resource_group}") 
+    # logging.info(f"[main] Function app name: {args.function_app_name}")
+    # logging.info(f"[main] Search principal ID: {args.search_principal_id}")
+    # logging.info(f"[main] Azure Search use MIS: {search_use_mis}")
+    # logging.info(f"[main] Enable managed identities: {args.enable_managed_identities}")
+    # logging.info(f"[main] Enable environment credentials: {args.enable_env_credentials}")
 
-    main(subscription_id=args.subscription_id, resource_group=args.resource_group, function_app_name=args.function_app_name, search_principal_id=args.search_principal_id, 
-        azure_search_use_mis=search_use_mis, enable_managed_identities=args.enable_managed_identities, enable_env_credentials=args.enable_env_credentials)
-    
+    # main(subscription_id=args.subscription_id, resource_group=args.resource_group, function_app_name=args.function_app_name, search_principal_id=args.search_principal_id, 
+    #     azure_search_use_mis=search_use_mis, enable_managed_identities=args.enable_managed_identities, enable_env_credentials=args.enable_env_credentials)
+
+    create_indexer_body(indexer_name="nam-indexer", index_name="ragindex")
+
