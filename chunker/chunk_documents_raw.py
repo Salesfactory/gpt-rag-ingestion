@@ -41,30 +41,7 @@ def chunk_document(data):
             "category": "default",
             "url": data['documentUrl'],
             "content": chunk.content,
-            "contentVector": chunk.embedding_metadata['embedding'] # type: ignore
+            "vector": chunk.embedding_metadata['embedding'] # type: ignore
         })
-
-    # chunks = [{
-    #                     "filepath": data['documentUrl'].split('/')[-1],
-    #                     "chunk_id": 0,
-    #                     "offset": 0,
-    #                     "length": 0,
-    #                     "title": "default",
-    #                     "category": "default",
-    #                     "url": data['documentUrl'],
-    #                     "content": "AAA",
-    #                     "contentVector": [0.1] * 1536,                    
-    #                 },
-    #                 {
-    #                     "filepath": data['documentUrl'].split('/')[-1],
-    #                     "chunk_id": 2,
-    #                     "offset": 0,
-    #                     "length": 0,
-    #                     "title": "default",
-    #                     "category": "default",
-    #                     "url": data['documentUrl'],
-    #                     "content": "AAAxxxx",
-    #                     "contentVector": [0.1] * 1536,
-    # }]
 
     return chunks, errors, warnings

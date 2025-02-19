@@ -93,7 +93,7 @@ def document_chunking(req: func.HttpRequest) -> func.HttpResponse:
             # Debug logging
             for idx, chunk in enumerate(chunks):
                 processed_chunk = chunk.copy()
-                processed_chunk.pop('contentVector', None)
+                processed_chunk.pop('vector', None)
                 if 'content' in processed_chunk and isinstance(processed_chunk['content'], str):
                     processed_chunk['content'] = processed_chunk['content'][:100]
                 logging.debug(f"[document_chunking][{filename}] Chunk {idx + 1}: {json.dumps(processed_chunk, indent=4)}")

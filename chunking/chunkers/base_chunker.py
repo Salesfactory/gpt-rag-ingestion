@@ -224,7 +224,7 @@ class BaseChunker:
             "summary": summary,
             "category": "",
             "length": len(truncated_content),  # Length in characters
-            "contentVector": content_vector,
+            "vector": content_vector,
             "title": self._extract_title_from_filename(self.filename) if not title else title,
             "page": page,
             "offset": offset,

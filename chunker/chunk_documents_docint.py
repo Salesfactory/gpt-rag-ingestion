@@ -231,7 +231,7 @@ def get_chunk(content, url, page, chunk_id, text_embedder):
             "url": url,
             "filepath": get_filename(url),            
             "content": content,
-            "contentVector": text_embedder.embed_content(content)
+            "vector": text_embedder.embed_content(content)
     }
     logging.info(f"Chunk: {chunk}.")
     return chunk
