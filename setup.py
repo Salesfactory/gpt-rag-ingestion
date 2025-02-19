@@ -1,5 +1,6 @@
 import logging
 import time
+import os
 import requests
 import argparse
 import json
@@ -310,6 +311,356 @@ def approve_search_shared_private_access(subscription_id, resource_group, storag
         raise
 
 
+def create_index_body(index_name):
+    # Load environment variables
+        
+        # Azure Cognitive Search settings
+        service_name = os.getenv("AZURE_SEARCH_SERVICE_NAME")
+        api_version = "2024-11-01-preview" 
+        admin_key = os.getenv("AZURE_SEARCH_ADMIN_KEY")
+        
+        # Endpoint URL
+        endpoint = f"https://{service_name}.search.windows.net/indexes/{index_name}?api-version={api_version}"
+        
+        # Headers
+        headers = {
+            'Content-Type': 'application/json',
+            'api-key': admin_key
+        }
+        
+        # Index definition
+        body = {
+            "name": index_name,
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "Edm.String",
+                    "searchable": True,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": True,
+                    "analyzer": "keyword",
+                    "synonymMaps": []
+                },
+                {
+                    "name": "parent_id",
+                    "type": "Edm.String",
+                    "searchable": False,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "metadata_storage_path",
+                    "type": "Edm.String",
+                    "searchable": False,
+                    "filterable": False,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": False,
+                    "facetable": False,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "metadata_storage_name",
+                    "type": "Edm.String",
+                    "searchable": False,
+                    "filterable": False,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": False,
+                    "facetable": False,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "chunk_id",
+                    "type": "Edm.Int32",
+                    "searchable": False,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "content",
+                    "type": "Edm.String",
+                    "searchable": True,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "analyzer": "standard",
+                    "synonymMaps": []
+                },
+                {
+                    "name": "page",
+                    "type": "Edm.Int32",
+                    "searchable": False,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "offset",
+                    "type": "Edm.Int64",
+                    "searchable": False,
+                    "filterable": False,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "length",
+                    "type": "Edm.Int32",
+                    "searchable": False,
+                    "filterable": False,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "title",
+                    "type": "Edm.String",
+                    "searchable": True,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "analyzer": "standard",
+                    "synonymMaps": []
+                },
+                {
+                    "name": "category",
+                    "type": "Edm.String",
+                    "searchable": True,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "analyzer": "standard",
+                    "synonymMaps": []
+                },
+                {
+                    "name": "filepath",
+                    "type": "Edm.String",
+                    "searchable": False,
+                    "filterable": False,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "url",
+                    "type": "Edm.String",
+                    "searchable": False,
+                    "filterable": False,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "vector",
+                    "type": "Collection(Edm.Single)",
+                    "searchable": True,
+                    "filterable": False,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": False,
+                    "facetable": False,
+                    "key": False,
+                    "dimensions": 1536,
+                    "vectorSearchProfile": "myHnswProfile",
+                    "synonymMaps": []
+                },
+                {
+                    "name": "keyPhrases",
+                    "type": "Collection(Edm.String)",
+                    "searchable": True,
+                    "filterable": False,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": False,
+                    "facetable": False,
+                    "key": False,
+                    "analyzer": "standard.lucene",
+                    "synonymMaps": []
+                },
+                {
+                    "name": "languageCode",
+                    "type": "Edm.String",
+                    "searchable": True,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": False,
+                    "facetable": False,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "languageName",
+                    "type": "Edm.String",
+                    "searchable": True,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": False,
+                    "facetable": False,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "organization_id",
+                    "type": "Edm.String",
+                    "searchable": True,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": False,
+                    "facetable": False,
+                    "key": False,
+                    "analyzer": "standard.lucene",
+                    "synonymMaps": []
+                }
+            ],
+            "scoringProfiles": [
+                {
+                    "name": f"{index_name}-scoring-profile",
+                    "functionAggregation": "sum",
+                    "text": {
+                        "weights": {
+                            "content": 45,
+                            "keyPhrases": 45,
+                            "title": 5
+                        }
+                    },
+                    "functions": []
+                }
+            ],
+            "corsOptions": {
+                "allowedOrigins": ["*"],
+                "maxAgeInSeconds": 60
+            },
+            "suggesters": [],
+            "analyzers": [],
+            "normalizers": [],
+            "tokenizers": [],
+            "tokenFilters": [],
+            "charFilters": [],
+            "similarity": {
+                "@odata.type": "#Microsoft.Azure.Search.BM25Similarity"
+            },
+            "semantic": {
+                "configurations": [
+                    {
+                        "name": "my-semantic-config",
+                        "prioritizedFields": {
+                            "prioritizedContentFields": [
+                                {
+                                    "fieldName": "content"
+                                }
+                            ],
+                            "prioritizedKeywordsFields": [
+                                {
+                                    "fieldName": "category"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "vectorSearch": {
+                "algorithms": [
+                    {
+                        "name": "myHnswConfig",
+                        "kind": "hnsw",
+                        "hnswParameters": {
+                            "metric": "cosine",
+                            "m": 4,
+                            "efConstruction": 400,
+                            "efSearch": 500
+                        }
+                    }
+                ],
+                "profiles": [
+                    {
+                        "name": "myHnswProfile",
+                        "algorithm": "myHnswConfig",
+                        "vectorizer": "vector-ce-vectorizer"
+                    }
+                ],
+                "vectorizers": [
+                    {
+                        "name": "vector-ce-vectorizer",
+                        "kind": "azureOpenAI",
+                        "azureOpenAIParameters": {
+                            "resourceUri": os.getenv("AZURE_OPENAI_ENDPOINT"),
+                            "deploymentId": "text-embedding-3-small",
+                            "apiKey": os.getenv("AZURE_OPENAI_API_KEY"),
+                            "modelName": "text-embedding-3-small"
+                        }
+                    }
+                ],
+                "compressions": []
+            }
+        }
+        
+        # First, try to delete the existing index if it exists
+        try:
+            delete_response = requests.delete(endpoint, headers=headers)
+            print(f"Delete existing index response: {delete_response.status_code}")
+        except Exception as e:
+            print(f"Error deleting existing index: {e}")
+        
+        # Create the new index
+        try:
+            response = requests.put(endpoint, headers=headers, json=body)
+            
+            if response.status_code in [200, 201]:
+                print("Index created successfully!")
+                print(response.json())
+            else:
+                print(f"Error creating index. Status code: {response.status_code}")
+                print(f"Error message: {response.text}")
+                
+        except Exception as e:
+            print(f"Error creating index: {e}")
+        
+        return body
 def execute_setup(subscription_id, resource_group, function_app_name, search_principal_id, azure_search_use_mis, enable_managed_identities, enable_env_credentials):
     """
     This function performs the necessary steps to set up the ingestion sub components, such as creating the required datastores and indexers.
@@ -366,16 +717,6 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
     logging.info(f"[execute_setup] Storage resource group: {azure_storage_resource_group}") 
     logging.info(f"[execute_setup] Azure OpenAI resource group: {azure_aoai_resource_group}")        
     
-    # NL2SQL Elements
-    storage_container_nl2sql = "nl2sql"
-    search_index_name_nl2sql_queries = "nl2sql-queries"
-    search_index_name_nl2sql_tables = "nl2sql-tables"
-    search_index_name_nl2sql_columns = "nl2sql-columns"
-
-    logging.info(f"[execute_setup] NL2SQL Storage container: {storage_container_nl2sql}")
-    logging.info(f"[execute_setup] NL2SQL Search index name (queries): {search_index_name_nl2sql_queries}")
-    logging.info(f"[execute_setup] NL2SQL Search index name (tables): {search_index_name_nl2sql_tables}")
-    logging.info(f"[execute_setup] NL2SQL Search index name (columns): {search_index_name_nl2sql_columns}")    
 
     ###########################################################################
     # Get function key to be used later when creating the skillset
@@ -428,14 +769,6 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
     create_datasource(search_service, search_api_version, f"{search_index_name}", storage_connection_string, storage_container, credential)
 
     # Creating NL2SQL datasource in different subfolders
-    nl2sql_subfolders = {
-        "queries": search_index_name_nl2sql_queries,
-        "tables": search_index_name_nl2sql_tables,
-        "columns": search_index_name_nl2sql_columns
-    }
-
-    for subfolder, index_name in nl2sql_subfolders.items():
-        create_datasource(search_service, search_api_version, index_name, storage_connection_string, "nl2sql", credential, subfolder=subfolder)
 
     response_time = time.time() - start_time
     logging.info(f"Create datastores step. {round(response_time, 2)} seconds")
@@ -444,34 +777,278 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
     ###############################################################################
     # Creating indexes
     ###############################################################################
-
-    def create_index_body(index_name, fields, content_field_name, keyword_field_name, vector_dimensions, vector_profile_name="myHnswProfile", vector_algorithm_name="myHnswConfig", dimensions=3072):
+    def create_index_body(index_name):
+    # Load environment variables
+        
+        # Azure Cognitive Search settings
+        service_name = os.getenv("AZURE_SEARCH_SERVICE_NAME")
+        api_version = "2024-11-01-preview" 
+        admin_key = os.getenv("AZURE_SEARCH_ADMIN_KEY")
+        
+        # Endpoint URL
+        endpoint = f"https://{service_name}.search.windows.net/indexes/{index_name}?api-version={api_version}"
+        
+        # Headers
+        headers = {
+            'Content-Type': 'application/json',
+            'api-key': admin_key
+        }
+        
+        # Index definition
         body = {
             "name": index_name,
-            "fields": fields,
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "Edm.String",
+                    "searchable": True,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": True,
+                    "analyzer": "keyword",
+                    "synonymMaps": []
+                },
+                {
+                    "name": "parent_id",
+                    "type": "Edm.String",
+                    "searchable": False,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "metadata_storage_path",
+                    "type": "Edm.String",
+                    "searchable": False,
+                    "filterable": False,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": False,
+                    "facetable": False,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "metadata_storage_name",
+                    "type": "Edm.String",
+                    "searchable": False,
+                    "filterable": False,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": False,
+                    "facetable": False,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "chunk_id",
+                    "type": "Edm.Int32",
+                    "searchable": False,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "content",
+                    "type": "Edm.String",
+                    "searchable": True,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "analyzer": "standard",
+                    "synonymMaps": []
+                },
+                {
+                    "name": "page",
+                    "type": "Edm.Int32",
+                    "searchable": False,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "offset",
+                    "type": "Edm.Int64",
+                    "searchable": False,
+                    "filterable": False,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "length",
+                    "type": "Edm.Int32",
+                    "searchable": False,
+                    "filterable": False,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "title",
+                    "type": "Edm.String",
+                    "searchable": True,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "analyzer": "standard",
+                    "synonymMaps": []
+                },
+                {
+                    "name": "category",
+                    "type": "Edm.String",
+                    "searchable": True,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "analyzer": "standard",
+                    "synonymMaps": []
+                },
+                {
+                    "name": "filepath",
+                    "type": "Edm.String",
+                    "searchable": False,
+                    "filterable": False,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "url",
+                    "type": "Edm.String",
+                    "searchable": False,
+                    "filterable": False,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": True,
+                    "facetable": True,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "vector",
+                    "type": "Collection(Edm.Single)",
+                    "searchable": True,
+                    "filterable": False,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": False,
+                    "facetable": False,
+                    "key": False,
+                    "dimensions": 1536,
+                    "vectorSearchProfile": "myHnswProfile",
+                    "synonymMaps": []
+                },
+                {
+                    "name": "keyPhrases",
+                    "type": "Collection(Edm.String)",
+                    "searchable": True,
+                    "filterable": False,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": False,
+                    "facetable": False,
+                    "key": False,
+                    "analyzer": "standard.lucene",
+                    "synonymMaps": []
+                },
+                {
+                    "name": "languageCode",
+                    "type": "Edm.String",
+                    "searchable": True,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": False,
+                    "facetable": False,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "languageName",
+                    "type": "Edm.String",
+                    "searchable": True,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": False,
+                    "facetable": False,
+                    "key": False,
+                    "synonymMaps": []
+                },
+                {
+                    "name": "organization_id",
+                    "type": "Edm.String",
+                    "searchable": True,
+                    "filterable": True,
+                    "retrievable": True,
+                    "stored": True,
+                    "sortable": False,
+                    "facetable": False,
+                    "key": False,
+                    "analyzer": "standard.lucene",
+                    "synonymMaps": []
+                }
+            ],
+            "scoringProfiles": [
+                {
+                    "name": f"{index_name}-scoring-profile",
+                    "functionAggregation": "sum",
+                    "text": {
+                        "weights": {
+                            "content": 45,
+                            "keyPhrases": 45,
+                            "title": 5
+                        }
+                    },
+                    "functions": []
+                }
+            ],
             "corsOptions": {
                 "allowedOrigins": ["*"],
                 "maxAgeInSeconds": 60
             },
-            "vectorSearch": {
-                "profiles": [
-                    {
-                        "name": vector_profile_name,
-                        "algorithm": vector_algorithm_name
-                    }
-                ],
-                "algorithms": [
-                    {
-                        "name": vector_algorithm_name,
-                        "kind": "hnsw",
-                        "hnswParameters": {
-                            "m": 4,
-                            "efConstruction": 400,
-                            "efSearch": 500,
-                            "metric": "cosine"
-                        }
-                    }
-                ]
+            "suggesters": [],
+            "analyzers": [],
+            "normalizers": [],
+            "tokenizers": [],
+            "tokenFilters": [],
+            "charFilters": [],
+            "similarity": {
+                "@odata.type": "#Microsoft.Azure.Search.BM25Similarity"
             },
             "semantic": {
                 "configurations": [
@@ -480,371 +1057,80 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
                         "prioritizedFields": {
                             "prioritizedContentFields": [
                                 {
-                                    "fieldName": content_field_name
+                                    "fieldName": "content"
                                 }
                             ],
                             "prioritizedKeywordsFields": [
                                 {
-                                    "fieldName": keyword_field_name
+                                    "fieldName": "category"
                                 }
                             ]
                         }
                     }
                 ]
+            },
+            "vectorSearch": {
+                "algorithms": [
+                    {
+                        "name": "myHnswConfig",
+                        "kind": "hnsw",
+                        "hnswParameters": {
+                            "metric": "cosine",
+                            "m": 4,
+                            "efConstruction": 400,
+                            "efSearch": 500
+                        }
+                    }
+                ],
+                "profiles": [
+                    {
+                        "name": "myHnswProfile",
+                        "algorithm": "myHnswConfig",
+                        "vectorizer": "vector-ce-vectorizer"
+                    }
+                ],
+                "vectorizers": [
+                    {
+                        "name": "vector-ce-vectorizer",
+                        "kind": "azureOpenAI",
+                        "azureOpenAIParameters": {
+                            "resourceUri": os.getenv("AZURE_OPENAI_ENDPOINT"),
+                            "deploymentId": "text-embedding-3-small",
+                            "apiKey": os.getenv("AZURE_OPENAI_API_KEY"),
+                            "modelName": "text-embedding-3-small"
+                        }
+                    }
+                ],
+                "compressions": []
             }
         }
+        
+        # First, try to delete the existing index if it exists
+        try:
+            delete_response = requests.delete(endpoint, headers=headers)
+            print(f"Delete existing index response: {delete_response.status_code}")
+        except Exception as e:
+            print(f"Error deleting existing index: {e}")
+        
+        # Create the new index
+        try:
+            response = requests.put(endpoint, headers=headers, json=body)
+            
+            if response.status_code in [200, 201]:
+                print("Index created successfully!")
+                print(response.json())
+            else:
+                print(f"Error creating index. Status code: {response.status_code}")
+                print(f"Error message: {response.text}")
+                
+        except Exception as e:
+            print(f"Error creating index: {e}")
+        
         return body
+    
+    # Create the main index
+    create_index_body(search_index_name)
 
-
-    logging.info("Creating indexes.")
-    start_time = time.time()
-
-    # Common vector search configurations
-    vector_profile_name = "myHnswProfile"
-    vector_algorithm_name = "myHnswConfig"
-
-    # Define index configurations
-    indices = [
-        {
-            "index_name": search_index_name,  # RAG index
-            "fields": [
-                {
-                    "name": "id",
-                    "type": "Edm.String",
-                    "key": True,
-                    "analyzer": "keyword",
-                    "searchable": True,
-                    "retrievable": True
-                },
-                {
-                    "name": "parent_id",
-                    "type": "Edm.String",
-                    "searchable": False,
-                    "retrievable": True
-                },                
-                {
-                    "name": "metadata_storage_path",
-                    "type": "Edm.String",
-                    "searchable": False,
-                    "sortable": False,
-                    "filterable": False,
-                    "facetable": False
-                },
-                {
-                    "name": "metadata_storage_name",
-                    "type": "Edm.String",
-                    "searchable": False,
-                    "sortable": False,
-                    "filterable": False,
-                    "facetable": False
-                },
-                {
-                    "name": "metadata_storage_last_modified",
-                    "type": "Edm.DateTimeOffset",
-                    "searchable": False,
-                    "sortable": True,
-                    "retrievable": True,
-                    "filterable": True
-                },
-                {
-                    "name": "metadata_security_id",
-                    "type": "Collection(Edm.String)",
-                    "searchable": False,
-                    "retrievable": True,
-                    "filterable": True
-                },                
-                {
-                    "name": "chunk_id",
-                    "type": "Edm.Int32",
-                    "searchable": False,
-                    "retrievable": True
-                },
-                {
-                    "name": "content",
-                    "type": "Edm.String",
-                    "searchable": True,
-                    "retrievable": True,
-                    "analyzer": search_analyzer_name 
-                },
-                {
-                    "name": "page",
-                    "type": "Edm.Int32",
-                    "searchable": False,
-                    "retrievable": True
-                },
-                {
-                    "name": "offset",
-                    "type": "Edm.Int64",
-                    "filterable": False,
-                    "searchable": False,
-                    "retrievable": True
-                },
-                {
-                    "name": "length",
-                    "type": "Edm.Int32",
-                    "filterable": False,
-                    "searchable": False,
-                    "retrievable": True
-                },
-                {
-                    "name": "title",
-                    "type": "Edm.String",
-                    "filterable": True,
-                    "searchable": True,
-                    "retrievable": True,
-                    "analyzer": search_analyzer_name
-                },
-                {
-                    "name": "category",
-                    "type": "Edm.String",
-                    "filterable": True,
-                    "searchable": True,
-                    "retrievable": True,
-                    "analyzer": search_analyzer_name
-                },
-                {
-                    "name": "filepath",
-                    "type": "Edm.String",
-                    "filterable": False,
-                    "searchable": False,
-                    "retrievable": True
-                },
-                {
-                    "name": "url",
-                    "type": "Edm.String",
-                    "filterable": False,
-                    "searchable": False,
-                    "retrievable": True
-                },
-                {
-                    "name": "summary",
-                    "type": "Edm.String",
-                    "filterable": False,
-                    "searchable": True,
-                    "retrievable": True
-                },
-                {
-                    "name": "relatedImages",
-                    "type": "Collection(Edm.String)",
-                    "filterable": False,
-                    "searchable": False,
-                    "retrievable": True
-                },
-                {
-                    "name": "relatedFiles",
-                    "type": "Collection(Edm.String)",
-                    "filterable": False,
-                    "searchable": False,
-                    "retrievable": True
-                },
-                {
-                    "name": "source",
-                    "type": "Edm.String",
-                    "searchable": False,
-                    "retrievable": True,
-                    "filterable": True
-                },
-                {
-                    "name": "contentVector",
-                    "type": "Collection(Edm.Single)",
-                    "searchable": True,
-                    "retrievable": True,
-                    "dimensions": azure_embeddings_vector_size,
-                    "vectorSearchProfile": vector_profile_name
-                }
-            ],
-            "content_field_name": "content",
-            "keyword_field_name": "category",
-            "vector_dimensions": azure_embeddings_vector_size
-        },
-        {
-            "index_name": search_index_name_nl2sql_queries,
-            "fields": [
-                {
-                    "name": "id",
-                    "type": "Edm.String",
-                    "key": True,
-                    "searchable": False,
-                    "filterable": False,
-                    "sortable": False,
-                    "facetable": False
-                },
-                {
-                    "name": "question",
-                    "type": "Edm.String",
-                    "searchable": True,
-                    "filterable": False,
-                    "retrievable": True,
-                    "sortable": False,
-                    "facetable": False,
-                    "analyzer": "standard.lucene"
-                },
-                {
-                    "name": "query",
-                    "type": "Edm.String",
-                    "searchable": False,
-                    "filterable": False,
-                    "retrievable": True,
-                    "sortable": False,
-                    "facetable": False
-                },
-                {
-                    "name": "selected_tables",
-                    "type": "Collection(Edm.String)",
-                    "searchable": False,
-                    "filterable": False,
-                    "retrievable": True
-                },
-                {
-                    "name": "selected_columns",
-                    "type": "Collection(Edm.String)",
-                    "searchable": False,
-                    "filterable": False,
-                    "retrievable": True
-                },
-                {
-                    "name": "reasoning",
-                    "type": "Edm.String",
-                    "searchable": True,
-                    "filterable": False,
-                    "retrievable": True,
-                    "sortable": False,
-                    "facetable": False
-                },
-                {
-                    "name": "contentVector",
-                    "type": "Collection(Edm.Single)",
-                    "searchable": True,
-                    "retrievable": True,
-                    "dimensions": azure_embeddings_vector_size,
-                    "vectorSearchProfile": vector_profile_name
-                }
-            ],
-            "content_field_name": "question",
-            "keyword_field_name": "question",
-            "vector_dimensions": azure_embeddings_vector_size
-        },
-        {
-            "index_name": search_index_name_nl2sql_tables,
-            "fields": [
-                {
-                    "name": "id",
-                    "type": "Edm.String",
-                    "key": True,
-                    "searchable": False,
-                    "filterable": False,
-                    "sortable": False,
-                    "facetable": False
-                },
-                {
-                    "name": "table_name",
-                    "type": "Edm.String",
-                    "searchable": True,
-                    "filterable": False,
-                    "retrievable": True,
-                    "sortable": False,
-                    "facetable": False,
-                    "analyzer": "standard.lucene"
-                },
-                {
-                    "name": "description",
-                    "type": "Edm.String",
-                    "searchable": True,
-                    "filterable": False,
-                    "retrievable": True,
-                    "sortable": False,
-                    "facetable": False,
-                    "analyzer": "standard.lucene"
-                },
-                {
-                    "name": "contentVector",
-                    "type": "Collection(Edm.Single)",
-                    "searchable": True,
-                    "retrievable": True,
-                    "dimensions": azure_embeddings_vector_size,
-                    "vectorSearchProfile": vector_profile_name
-                }
-            ],
-            "content_field_name": "description",
-            "keyword_field_name": "description",
-            "vector_dimensions": azure_embeddings_vector_size
-        },
-        {
-            "index_name": search_index_name_nl2sql_columns,
-            "fields": [
-                {
-                    "name": "id",
-                    "type": "Edm.String",
-                    "key": True,
-                    "searchable": False,
-                    "filterable": False,
-                    "sortable": False,
-                    "facetable": False
-                },
-                {
-                    "name": "table_name",
-                    "type": "Edm.String",
-                    "searchable": True,
-                    "filterable": True,
-                    "retrievable": True,
-                    "sortable": False,
-                    "facetable": False,
-                    "analyzer": "standard.lucene"
-                },
-                {
-                    "name": "column_name",
-                    "type": "Edm.String",
-                    "searchable": True,
-                    "filterable": False,
-                    "retrievable": True,
-                    "sortable": False,
-                    "facetable": False,
-                    "analyzer": "standard.lucene"
-                },
-                {
-                    "name": "description",
-                    "type": "Edm.String",
-                    "searchable": True,
-                    "filterable": False,
-                    "retrievable": True,
-                    "sortable": False,
-                    "facetable": False,
-                    "analyzer": "standard.lucene"
-                },
-                {
-                    "name": "contentVector",
-                    "type": "Collection(Edm.Single)",
-                    "searchable": True,
-                    "retrievable": True,
-                    "dimensions": azure_embeddings_vector_size,
-                    "vectorSearchProfile": vector_profile_name
-                }
-            ],
-            "content_field_name": "description",
-            "keyword_field_name": "description",
-            "vector_dimensions": azure_embeddings_vector_size
-        }
-    ]
-
-    # Iterate over each index configuration and create the index
-    for index in indices:
-        body = create_index_body(
-            index_name=index["index_name"],
-            fields=index["fields"],
-            content_field_name=index["content_field_name"],
-            keyword_field_name=index["keyword_field_name"],
-            vector_dimensions=index["vector_dimensions"],
-            vector_profile_name=vector_profile_name,
-            vector_algorithm_name=vector_algorithm_name,
-            dimensions=azure_embeddings_vector_size
-        )
-        # Delete existing index if it exists
-        call_search_api(search_service, search_api_version, "indexes", index["index_name"], "delete", credential)
-        # Create the index
-        call_search_api(search_service, search_api_version, "indexes", index["index_name"], "put", credential, body)
-
-    response_time = time.time() - start_time
-    logging.info(f"Indexes created in {round(response_time, 2)} seconds")
 
     ###########################################################################
     # 04 Creating AI Search skillsets
@@ -1291,33 +1577,26 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
     logging.info("05 Creating indexer step.")
     start_time = time.time()
     body = {
-        "dataSourceName" : f"{search_index_name}-datasource",
-        "targetIndexName" : f"{search_index_name}",
-        "skillsetName" : f"{search_index_name}-skillset-chunking",
-        "schedule" : { "interval" : f"{search_index_interval}"},
-        "fieldMappings" : [
+        "dataSourceName": f"{search_index_name}-datasource",
+        "targetIndexName": f"{search_index_name}",
+        "skillsetName": f"{search_index_name}-skillset-chunking",
+        "schedule": {"interval": f"{search_index_interval}"},
+        "fieldMappings": [
             {
-                "sourceFieldName" : "metadata_storage_path",
-                "targetFieldName" : "id",
-                "mappingFunction" : {
-                    "name" : "fixedLengthEncode"
-                }
-            }            
                 "sourceFieldName": "metadata_storage_path",
                 "targetFieldName": "id",
-                "mappingFunction": {"name": "fixedLengthEncode"},
+                "mappingFunction": {
+                    "name": "fixedLengthEncode"
+                }
             }
         ],
-        "outputFieldMappings" : [
-        ],
-        "parameters":
-        {
+        "outputFieldMappings": [],
+        "parameters": {
             "batchSize": 1,
-            "maxFailedItems":-1,
-            "maxFailedItemsPerBatch":-1,
+            "maxFailedItems": -1,
+            "maxFailedItemsPerBatch": -1,
             "base64EncodeKeys": True,
-            "configuration": 
-            {
+            "configuration": {
                 "dataToExtract": "allMetadata"
             }
         }
@@ -1438,26 +1717,10 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
     indexers = [
         {
             "indexer_name": "queries-indexer",
-            "index_name": f"{search_index_name_nl2sql_queries}",
-            "data_source_name": f"{search_index_name_nl2sql_queries}-datasource",
+            "index_name": f"{search_index_name}",
+            "data_source_name": f"{search_index_name}-datasource",
             "skillset_name": "queries-skillset",
             "field_mappings": field_mappings_queries,
-            "indexing_parameters": indexing_parameters
-        },
-        {
-            "indexer_name": "tables-indexer",
-            "index_name": f"{search_index_name_nl2sql_tables}",
-            "data_source_name": f"{search_index_name_nl2sql_tables}-datasource",
-            "skillset_name": "tables-skillset",
-            "field_mappings": field_mappings_tables,
-            "indexing_parameters": indexing_parameters
-        },
-        {
-            "indexer_name": "columns-indexer",
-            "index_name": f"{search_index_name_nl2sql_columns}",
-            "data_source_name": f"{search_index_name_nl2sql_columns}-datasource",
-            "skillset_name": "columns-skillset",
-            "field_mappings": field_mappings_columns,
             "indexing_parameters": indexing_parameters
         }
     ]
@@ -1514,29 +1777,30 @@ def main(subscription_id=None, resource_group=None, function_app_name=None, sear
     logging.info(f"Finished setup. {round(response_time,2)} seconds")
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')    
-    parser = argparse.ArgumentParser(description='Script to do the data ingestion setup for Azure Cognitive Search.')
-    parser.add_argument('-s', '--subscription_id', help='Subscription ID')
-    parser.add_argument('-r', '--resource_group', help='Resource group (Function App)')
-    parser.add_argument('-f', '--function_app_name', help='Chunking function app name')
-    parser.add_argument('-a', '--search_principal_id', default='none', help='Entra ID of the search service')
-    parser.add_argument('-m', '--azure_search_use_mis', help='Use Search Service Managed Identity to Connect to data ingestion function')
-    parser.add_argument('-i', '--enable_managed_identities', action='store_true', default=False, help='Use VM\'s managed identities for the setup')
-    parser.add_argument('-e', '--enable_env_credentials', action='store_true', default=False, help='Use environment credentials for the setup')    
-    args = parser.parse_args()
+    # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')    
+    # parser = argparse.ArgumentParser(description='Script to do the data ingestion setup for Azure Cognitive Search.')
+    # parser.add_argument('-s', '--subscription_id', help='Subscription ID')
+    # parser.add_argument('-r', '--resource_group', help='Resource group (Function App)')
+    # parser.add_argument('-f', '--function_app_name', help='Chunking function app name')
+    # parser.add_argument('-a', '--search_principal_id', default='none', help='Entra ID of the search service')
+    # parser.add_argument('-m', '--azure_search_use_mis', help='Use Search Service Managed Identity to Connect to data ingestion function')
+    # parser.add_argument('-i', '--enable_managed_identities', action='store_true', default=False, help='Use VM\'s managed identities for the setup')
+    # parser.add_argument('-e', '--enable_env_credentials', action='store_true', default=False, help='Use environment credentials for the setup')    
+    # args = parser.parse_args()
 
-    # format search_use_mis to boolean
-    search_use_mis = args.azure_search_use_mis.lower() == "true" if args.azure_search_use_mis not in [None, ""] else False
+    # # format search_use_mis to boolean
+    # search_use_mis = args.azure_search_use_mis.lower() == "true" if args.azure_search_use_mis not in [None, ""] else False
 
-    # Log all arguments
-    logging.info(f"[main] Subscription ID: {args.subscription_id}")
-    logging.info(f"[main] Resource group: {args.resource_group}") 
-    logging.info(f"[main] Function app name: {args.function_app_name}")
-    logging.info(f"[main] Search principal ID: {args.search_principal_id}")
-    logging.info(f"[main] Azure Search use MIS: {search_use_mis}")
-    logging.info(f"[main] Enable managed identities: {args.enable_managed_identities}")
-    logging.info(f"[main] Enable environment credentials: {args.enable_env_credentials}")
+    # # Log all arguments
+    # logging.info(f"[main] Subscription ID: {args.subscription_id}")
+    # logging.info(f"[main] Resource group: {args.resource_group}") 
+    # logging.info(f"[main] Function app name: {args.function_app_name}")
+    # logging.info(f"[main] Search principal ID: {args.search_principal_id}")
+    # logging.info(f"[main] Azure Search use MIS: {search_use_mis}")
+    # logging.info(f"[main] Enable managed identities: {args.enable_managed_identities}")
+    # logging.info(f"[main] Enable environment credentials: {args.enable_env_credentials}")
 
-    main(subscription_id=args.subscription_id, resource_group=args.resource_group, function_app_name=args.function_app_name, search_principal_id=args.search_principal_id, 
-        azure_search_use_mis=search_use_mis, enable_managed_identities=args.enable_managed_identities, enable_env_credentials=args.enable_env_credentials)
+    # main(subscription_id=args.subscription_id, resource_group=args.resource_group, function_app_name=args.function_app_name, search_principal_id=args.search_principal_id, 
+    #     azure_search_use_mis=search_use_mis, enable_managed_identities=args.enable_managed_identities, enable_env_credentials=args.enable_env_credentials)
     
+    create_index_body("nam-index")
