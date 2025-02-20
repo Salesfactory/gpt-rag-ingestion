@@ -86,9 +86,6 @@ def document_chunking(req: func.HttpRequest) -> func.HttpResponse:
 
             # Chunk the document
             chunks, errors, warnings = DocumentChunker().chunk_documents(input_data)
-
-            # Enrich chunks with metadata to be indexed
-            for chunk in chunks: chunk["source"] = "blob"
          
             # Debug logging
             for idx, chunk in enumerate(chunks):

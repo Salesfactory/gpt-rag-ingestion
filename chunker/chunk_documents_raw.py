@@ -3,7 +3,7 @@ import re
 from .text_chunker import TextChunker
 from .chunk_metadata_helper import ChunkEmbeddingHelper
 from utils.file_utils import get_filename
-
+from uuid import uuid4
 def has_supported_file_extension(file_path: str) -> bool:
     """Checks if the given file format is supported based on its file extension.
     Args:
@@ -32,6 +32,7 @@ def chunk_document(data):
     for chunk in chunking_result.chunks:
 
         chunks.append({
+            "id": str(uuid4()),
             "filepath": get_filename(data['documentUrl']),
             "chunk_id": chunk.embedding_metadata['index'], # type: ignore
             "offset": chunk.embedding_metadata['offset'],  # type: ignore
@@ -39,7 +40,9 @@ def chunk_document(data):
             "length": chunk.embedding_metadata['length'],  # type: ignore
             "title": chunk.title,
             "category": "default",
+            "metadata_storage_path": data['documentUrl'],
             "url": data['documentUrl'],
+            "metadata_storage_name": get_filename(data['documentUrl']),
             "content": chunk.content,
             "vector": chunk.embedding_metadata['embedding'] # type: ignore
         })
