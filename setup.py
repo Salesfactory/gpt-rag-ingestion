@@ -890,8 +890,8 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
                 ],
                 "outputs":[ 
                     {
-                        "name":"docintContent",
-                        "targetName":"docintContent"
+                        "name":"chunks",
+                        "targetName":"chunks"
                     }
                 ]
             },
@@ -899,11 +899,11 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
                 "@odata.type": "#Microsoft.Skills.Text.LanguageDetectionSkill",
                 "name": "Lenguage Detection",
                 "description": "Skill to get the language of the document",
-                "context": "/document/docintContent/pages/*",
+                "context": "/document/chunks/pages/*",
                 "inputs": [
                     {
                         "name": "text",
-                        "source": "/document/docintContent/pages/*",
+                        "source": "/document/chunks/pages/*",
                         "inputs": []
                     }
                 ],
@@ -926,18 +926,18 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
                 "@odata.type": "#Microsoft.Skills.Text.KeyPhraseExtractionSkill",
                 "name": "Key Phrase Extraction",
                 "description": "Skill to get the key phrases of the document",
-                "context": "/document/docintContent/pages/*",
+                "context": "/document/chunks/pages/*",
                 "defaultLanguageCode": "en",
                 "maxKeyPhraseCount": 10,
                 "inputs": [
                     {
                         "name": "text",
-                        "source": "/document/docintContent/pages/*",
+                        "source": "/document/chunks/pages/*",
                         "inputs": []
                     },
                     {
                         "name": "languageCode",
-                        "source": "/document/docintContent/pages/*/languageCode",
+                        "source": "/document/chunks/pages/*/languageCode",
                         "inputs": []
                     }
                 ],
@@ -954,11 +954,11 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
                 {
                     "targetIndexName":f"{search_index_name}",
                     "parentKeyFieldName": "parent_id",
-                    "sourceContext": "/document/docintContent/pages/*",
+                    "sourceContext": "/document/chunks/pages/*",
                     "mappings": [
                         {
                             "name": "url",
-                            "source": "/document/docintContent/url",
+                            "source": "/document/chunks/url",
                             "inputs": []
                         },
                         {
@@ -968,17 +968,17 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
                         },
                         {
                             "name": "filepath",
-                            "source": "/document/docintContent/url",
+                            "source": "/document/chunks/url",
                             "inputs": []
                         },
                         {
                             "name": "content",
-                            "source": "/document/docintContent/pages/*",
+                            "source": "/document/chunks/pages/*",
                             "inputs": []
                         },
                         {
                             "name": "vector",
-                            "source": "/document/docintContent/pages/*/vector",
+                            "source": "/document/chunks/pages/*/vector",
                             "inputs": []
                         },
                         {
@@ -993,17 +993,17 @@ def execute_setup(subscription_id, resource_group, function_app_name, search_pri
                         },
                         {
                             "name": "keyPhrases",
-                            "source": "/document/docintContent/pages/*/keyPhrases",
+                            "source": "/document/chunks/pages/*/keyPhrases",
                             "inputs": []
                         },
                         {
                             "name": "languageCode",
-                            "source": "/document/docintContent/pages/*/languageCode",
+                            "source": "/document/chunks/pages/*/languageCode",
                             "inputs": []
                         },
                         {
                             "name": "languageName",
-                            "source": "/document/docintContent/pages/*/languageName",
+                            "source": "/document/chunks/pages/*/languageName",
                             "inputs": []
                         }                      
                     ]
