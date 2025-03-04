@@ -5,14 +5,6 @@ import requests
 from typing import Optional 
 import json 
 
-from azure.identity import (
-    ManagedIdentityCredential,
-    AzureCliCredential,
-    ChainedTokenCredential
-)
-
-from azure.core.exceptions import ClientAuthenticationError, HttpResponseError
-
 # set up logging configuration globally
 # logging.getLogger("azure").setLevel(logging.WARNING)
 
