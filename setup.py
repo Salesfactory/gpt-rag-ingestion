@@ -497,6 +497,20 @@ def create_index_body(index_name: str, search_api_version: str = "2024-11-01-pre
                 "synonymMaps": [],
             },
             {
+                "name": "imageEmbedding",
+                "type": "Collection(Edm.Single)",
+                "searchable": True,
+                "filterable": False,
+                "retrievable": True,
+                "stored": True,
+                "sortable": False,
+                "facetable": False,
+                "key": False,
+                "dimensions": 1024,
+                "vectorSearchProfile": "myHnswProfile",
+                "synonymMaps": []
+                },
+            {
                 "name": "keyPhrases",
                 "type": "Collection(Edm.String)",
                 "searchable": True,
