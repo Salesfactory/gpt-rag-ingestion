@@ -33,3 +33,8 @@ psutil
 # DO NOT include azure-functions-worker in this file
 # The Python Worker is managed by Azure Functions platform
 # Manually managing azure-functions-worker may cause unexpected issues
+
+rich==13.9.4
+azure-ai-documentintelligence==1.0.0b4
+pillow==10.4.0
+pymupdf==1.25.1
