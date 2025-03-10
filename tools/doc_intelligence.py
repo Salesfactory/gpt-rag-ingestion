@@ -128,6 +128,12 @@ class DocumentIntelligenceClient:
         result = {}
         errors = []
 
+        # Initialize the azure content understanding describer
+        content_understanding_describer = ContentUnderstandingDescriber(
+            endpoint=os.getenv('AZ_COMPUTER_VISION_ENDPOINT'),
+            credential=self.credential
+        )
+
         # Get the file extension from the filename
         file_ext = self._get_file_extension(filename)
 
