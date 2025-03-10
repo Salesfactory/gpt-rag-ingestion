@@ -8,7 +8,13 @@ import requests
 from urllib.parse import urlparse, unquote
 from azure.identity import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential
 from azure.storage.blob import BlobServiceClient
-from azure.core.exceptions import ClientAuthenticationError, ResourceNotFoundError
+from azure.core.exceptions import ClientAuthenticationError, 
+from azure.ai.documentintelligence.models import (
+    AnalyzeDocumentRequest,
+    AnalyzeResult,
+    DocumentFigure,
+    DocumentTable,
+)
 
 class DocumentIntelligenceClient:
     """
@@ -39,11 +45,7 @@ class DocumentIntelligenceClient:
         self.DEFAULT_API_VERSION = '2023-07-31'
         self.api_version = os.getenv('FORM_REC_API_VERSION', os.getenv('DOCINT_API_VERSION', self.DEFAULT_API_VERSION))
         self.docint_40_api = self.api_version >= self.DOCINT_40_API
-
-        # Network isolation
-        network_isolation = os.getenv('NETWORK_ISOLATION', 'false')
-        self.network_isolation = network_isolation.lower() == 'true'
-
+        
         # Supported extensions
         self.file_extensions = [
             "pdf",
