@@ -8,13 +8,14 @@ import requests
 from urllib.parse import urlparse, unquote
 from azure.identity import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential
 from azure.storage.blob import BlobServiceClient
-from azure.core.exceptions import ClientAuthenticationError, 
+from azure.core.exceptions import ClientAuthenticationError
 from azure.ai.documentintelligence.models import (
     AnalyzeDocumentRequest,
     AnalyzeResult,
     DocumentFigure,
     DocumentTable,
 )
+from mediadescriber import ContentUnderstandingDescriber
 
 class DocumentIntelligenceClient:
     """
