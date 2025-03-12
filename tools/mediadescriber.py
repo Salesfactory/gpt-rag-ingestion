@@ -1,4 +1,5 @@
 import logging
+import os
 import requests
 from abc import ABC
 from azure.core.credentials import TokenCredential
@@ -36,12 +37,16 @@ class ContentUnderstandingDescriber:
         },
     }
 
-    def __init__(self, endpoint: str, credential: TokenCredential):
+    def __init__(self, endpoint: str, api_key: str):
         self.endpoint = endpoint
-        self.credential = credential
+        self.api_key = api_key
 
     def poll_api(self, poll_url, headers):
-        @retry(stop=stop_after_attempt(60), wait=wait_fixed(2), retry=retry_if_exception_type(ValueError))
+        @retry(
+            stop=stop_after_attempt(60),
+            wait=wait_fixed(2),
+            retry=retry_if_exception_type(ValueError),
+        )
         def poll():
             response = requests.get(poll_url, headers=headers)
             response.raise_for_status()
@@ -57,17 +62,16 @@ class ContentUnderstandingDescriber:
     def create_analyzer(self):
         logger.info("Creating analyzer '%s'...", self.analyzer_schema["analyzerId"])
 
-        token = self.credential.get_token("https://cognitiveservices.azure.com/.default")
-        headers = {"Authorization": f"Bearer {token.token}", "Content-Type": "application/json"}
+        headers = {
+            "Ocp-Apim-Subscription-Key": self.api_key,
+            "Content-Type": "application/json",
+        }
         params = {"api-version": self.CU_API_VERSION}
         analyzer_id = self.analyzer_schema["analyzerId"]
         cu_endpoint = f"{self.endpoint}/contentunderstanding/analyzers/{analyzer_id}"
 
         response = requests.put(
-            url=cu_endpoint,
-            params=params,
-            headers=headers,
-            json=self.analyzer_schema
+            url=cu_endpoint, params=params, headers=headers, json=self.analyzer_schema
         )
 
         if response.status_code == 409:
@@ -75,7 +79,7 @@ class ContentUnderstandingDescriber:
             return
         elif response.status_code != 201:
             raise Exception("Error creating analyzer", response.text)
-        
+
         poll_url = response.headers.get("Operation-Location")
         with Progress() as progress:
             progress.add_task("Creating analyzer...", total=None, start=False)
@@ -83,13 +87,37 @@ class ContentUnderstandingDescriber:
 
     def describe_image(self, image_bytes: bytes) -> str:
         logger.info("Sending image to Azure Content Understanding service...")
-        token = self.credential.get_token("https://cognitiveservices.azure.com/.default")
-        headers = {"Authorization": "Bearer " + token.token}
+
+        # Map of common image file extensions to MIME types
+        content_types = {
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".gif": "image/gif",
+            ".bmp": "image/bmp",
+            ".tiff": "image/tiff",
+        }
+
+        # Default to jpeg if format can't be determined
+        content_type = "image/jpeg"
+
+        # Try to detect format from image bytes
+        if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+            content_type = "image/png"
+        elif image_bytes.startswith(b"\xff\xd8"):
+            content_type = "image/jpeg"
+
+        headers = {
+            "Ocp-Apim-Subscription-Key": self.api_key,
+            "Content-Type": content_type,
+        }
         params = {"api-version": self.CU_API_VERSION}
         analyzer_name = self.analyzer_schema["analyzerId"]
 
+        url = f"{self.endpoint.rstrip('/')}/contentunderstanding/analyzers/{analyzer_name}:analyze"
+
         response = requests.post(
-            url=f"{self.endpoint}/contentunderstanding/analyzers/{analyzer_name}:analyze",
+            url=url,
             params=params,
             headers=headers,
             data=image_bytes,
@@ -103,3 +131,54 @@ class ContentUnderstandingDescriber:
 
         fields = results["result"]["contents"][0]["fields"]
         return fields["Description"]["valueString"]
+
+
+if __name__ == "__main__":
+    describer = ContentUnderstandingDescriber(
+        endpoint=os.getenv("AZ_COMPUTER_VISION_ENDPOINT"),
+        api_key=os.getenv("AZ_COMPUTER_VISION_KEY"),
+    )
+    describer.create_analyzer()
+
+    # Provide a link with sas token of the image here (the sas code below will expire in an hour)
+    image_url = "https://strag0vm2b2htvuuclm.blob.core.windows.net/ragindex-test/cat.jpeg?sp=r&st=2025-03-12T15:59:45Z&se=2025-03-12T23:59:45Z&spr=https&sv=2022-11-02&sr=b&sig=uFuXTtY3Vm9XayugiPCXgs02uq1Wv1X49ZohYsxyFNw%3D"
+    try:
+        # Download the image from URL with proper headers
+        logger.info(f"Downloading image from: {image_url}")
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "image/jpeg,image/png,image/*",
+        }
+        response = requests.get(image_url, stream=True, headers=headers)
+        response.raise_for_status()
+
+        # Check content type from response
+        content_type = response.headers.get("Content-Type", "")
+        logger.info(f"Image Content-Type from server: {content_type}")
+
+        # Get image data and show first few bytes for debugging
+        image_bytes = response.content
+        logger.info(f"First few bytes of image: {image_bytes[:20]}")
+        if not image_bytes:
+            raise ValueError("No image data received")
+        logger.info(f"Downloaded image size: {len(image_bytes)} bytes")
+
+        # Process the image
+        try:
+            result = describer.describe_image(image_bytes)
+            print("Image description:", result)
+        except requests.exceptions.HTTPError as e:
+            error_text = e.response.text if hasattr(e.response, "text") else str(e)
+            print(f"Azure API error: {error_text}")
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error downloading image: {e}")
+    except ValueError as e:
+        print(f"Image validation error: {e}")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+
+    # test with local file
+    # with open("/path/to/local/image.png", "rb") as f:
+    #     image_bytes = f.read()
+    # print(describer.describe_image(image_bytes))
