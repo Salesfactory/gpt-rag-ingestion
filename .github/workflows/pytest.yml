@@ -4,9 +4,7 @@ on:
     branches:
       - develop
       - main
-  push:
-    branches:
-        - FA-744-setup-testing-environment
+
 jobs:
   test-package:
     name: Test ${{matrix.os}} Python ${{matrix.python-version}}
