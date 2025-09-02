@@ -289,30 +289,6 @@ def create_index_body(
                 "synonymMaps": [],
             },
             {
-                "name": "languageCode",
-                "type": "Edm.String",
-                "searchable": True,
-                "filterable": True,
-                "retrievable": True,
-                "stored": True,
-                "sortable": False,
-                "facetable": False,
-                "key": False,
-                "synonymMaps": [],
-            },
-            {
-                "name": "languageName",
-                "type": "Edm.String",
-                "searchable": True,
-                "filterable": True,
-                "retrievable": True,
-                "stored": True,
-                "sortable": False,
-                "facetable": False,
-                "key": False,
-                "synonymMaps": [],
-            },
-            {
                 "name": "organization_id",
                 "type": "Edm.String",
                 "searchable": True,
@@ -325,15 +301,51 @@ def create_index_body(
                 "analyzer": "standard.lucene",
                 "synonymMaps": [],
             },
+            {
+                "name": "date_uploaded",
+                "type": "Edm.DateTimeOffset",
+                "searchable": False,
+                "filterable": True,
+                "retrievable": True,
+                "stored": True,
+                "sortable": True,
+                "facetable": True,
+                "key": False,
+                "synonymMaps": [],
+            },
+            
+                {
+                "name": "date_last_modified",
+                "type": "Edm.DateTimeOffset",
+                "searchable": False,
+                "filterable": True,
+                "retrievable": True,
+                "stored": True,
+                "sortable": True,
+                "facetable": True,
+                "key": False,
+                "synonymMaps": [],
+            },
         ],
         "scoringProfiles": [
             {
                 "name": f"{index_name}-scoring-profile",
                 "functionAggregation": "sum",
                 "text": {"weights": {"content": 4, "keyPhrases": 5, "title": 7}},
-                "functions": [],
+                "functions": [
+                    {
+                        "fieldName": "date_last_modified",
+                        "interpolation": "linear",
+                        "type": "freshness",
+                        "boost": 10,
+                        "freshness": {
+                            "boostingDuration": "P183D",
+                        },
+                    },
+                ],
             }
         ],
+        "defaultScoringProfile": f"{index_name}-scoring-profile",
         "corsOptions": {"allowedOrigins": ["*"], "maxAgeInSeconds": 60},
         "suggesters": [],
         "analyzers": [],
@@ -343,12 +355,14 @@ def create_index_body(
         "charFilters": [],
         "similarity": {"@odata.type": "#Microsoft.Azure.Search.BM25Similarity"},
         "semantic": {
+            "defaultConfiguration": "my-semantic-config",
             "configurations": [
                 {
                     "name": "my-semantic-config",
                     "prioritizedFields": {
                         "prioritizedContentFields": [{"fieldName": "content"}],
                         "prioritizedKeywordsFields": [{"fieldName": "category"}],
+                        "titleField": {"fieldName": "title"},
                     },
                 }
             ]
