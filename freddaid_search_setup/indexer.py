@@ -71,6 +71,7 @@ def create_indexer_body(
             "configuration": {
                 "dataToExtract": "contentAndMetadata",
                 "parsingMode": "default",
+                "excludedFileNameExtensions": ".png,.jpg,.jpeg,.gif,.bmp"
             },
         },
     }
