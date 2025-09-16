@@ -4,6 +4,9 @@ import os
 import requests
 from typing import Optional
 import json
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # set up logging configuration globally
 # logging.getLogger("azure").setLevel(logging.WARNING)
