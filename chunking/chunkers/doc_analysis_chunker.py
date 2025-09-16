@@ -100,7 +100,7 @@ class DocAnalysisChunker(BaseChunker):
         try:
             doc_int_parser = DocumentAnalysisParser(
                 endpoint="https://eastus.api.cognitive.microsoft.com/",
-                credential=AzureKeyCredential("9965078185cb429fbf1a6d485e444144"),#os.getenv("COGNITIVE_SERVICES_KEY")),
+                credential=AzureKeyCredential(os.getenv("COGNITIVE_SERVICES_KEY")),
                 use_content_understanding=False,
                 content_understanding_endpoint=os.getenv("AZ_COMPUTER_VISION_ENDPOINT"),
             )

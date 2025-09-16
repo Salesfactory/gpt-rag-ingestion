@@ -22,7 +22,7 @@ logging.basicConfig(
 # Constants
 ########################################################
 
-document_chunking_func_key = os.getenv("DOCUMENT_CHUNKING_FUNCTION_KEY")
+document_chunking_func_key = os.getenv("DOCUMENT_CHUNKING_FUNCTION_KEY", "")
 search_api_version = "2024-11-01-preview"
 azure_search_admin_key = os.getenv("AZURE_SEARCH_ADMIN_KEY")
 search_service_name = os.getenv("AZURE_SEARCH_SERVICE_NAME")

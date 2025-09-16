@@ -28,7 +28,7 @@ TOKEN_OVERLAP = int(os.environ["TOKEN_OVERLAP"])
 
 # Doc int version
 DOCINT_40_API = '2023-10-31-preview'
-default_api_version = '2023-07-31'
+default_api_version = '2024-11-30'
 DOCINT_API_VERSION = os.getenv('FORM_REC_API_VERSION', os.getenv('DOCINT_API_VERSION', default_api_version))
 
 # Network isolation active?
