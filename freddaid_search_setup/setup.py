@@ -8,7 +8,9 @@ from index import create_index_body
 from datasource import create_datasource
 from skillset import create_skillset
 from indexer import create_indexer_body
+from dotenv import load_dotenv
 
+load_dotenv()
 
 # set up logging configuration globally
 # logging.getLogger("azure").setLevel(logging.WARNING)
