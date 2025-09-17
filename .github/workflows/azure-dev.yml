@@ -36,7 +36,14 @@ jobs:
         env:
             AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
   
-      - name: Refresh Environment
+      - name: Create Environment Reference
+        run: azd env new ${{ vars.AZURE_ENV_NAME }} --location ${{ vars.AZURE_LOCATION }} --subscription ${{ vars.AZURE_SUBSCRIPTION_ID }} || azd env select ${{ vars.AZURE_ENV_NAME }}
+        env:
+            AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+            AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+            AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Refresh Environment with Specific Deployment
         run: azd env refresh --no-prompt
         env:
             AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
