@@ -37,7 +37,7 @@ jobs:
             AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
   
       - name: Refresh Enviroment
-        run: azd env refresh --no-prompt
+        run: azd env refresh --no-prompt --force
         env:
             AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
             AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
