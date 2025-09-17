@@ -1,8 +1,8 @@
 # .github/workflows/azure-dev.yml
 name: Build and deploy
-on: 
-  push: 
-    branches: 
+on:
+  push:
+    branches:
       - develop
 
 jobs:
@@ -27,7 +27,7 @@ jobs:
         run: |
             $info = $Env:AZURE_CREDENTIALS | ConvertFrom-Json -AsHashtable;
             Write-Host "::add-mask::$($info.clientSecret)"
-  
+
             azd auth login `
               --client-id "$($info.clientId)" `
               --client-secret "$($info.clientSecret)" `
@@ -35,15 +35,8 @@ jobs:
         shell: pwsh
         env:
             AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
-  
-      - name: Create Environment Reference
-        run: azd env new ${{ vars.AZURE_ENV_NAME }} --location ${{ vars.AZURE_LOCATION }} --subscription ${{ vars.AZURE_SUBSCRIPTION_ID }} || azd env select ${{ vars.AZURE_ENV_NAME }}
-        env:
-            AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
-            AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
-            AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Refresh Environment with Specific Deployment
+      - name: Refresh Enviroment
         run: azd env refresh --no-prompt
         env:
             AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
