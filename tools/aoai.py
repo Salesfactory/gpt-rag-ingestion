@@ -31,14 +31,12 @@ class AzureOpenAIClient:
         self.openai_api_base = f"https://{self.openai_service_name}.openai.azure.com"
         self.openai_api_version = os.getenv('AZURE_OPENAI_API_VERSION')
         self.openai_embeddings_deployment = os.getenv('AZURE_OPENAI_EMBEDDING_DEPLOYMENT')
-        self.openai_gpt_deployment = os.getenv('AZURE_OPENAI_CHATGPT_DEPLOYMENT')
         
         # Log a warning if any environment variable is empty
         env_vars = {
             'AZURE_OPENAI_SERVICE_NAME': self.openai_service_name,
             'AZURE_OPENAI_API_VERSION': self.openai_api_version,
             'AZURE_OPENAI_EMBEDDING_DEPLOYMENT': self.openai_embeddings_deployment,
-            'AZURE_OPENAI_CHATGPT_DEPLOYMENT': self.openai_gpt_deployment
         }
         
         for var_name, var_value in env_vars.items():

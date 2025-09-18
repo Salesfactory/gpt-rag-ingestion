@@ -160,7 +160,6 @@ class BaseChunker:
         embedding_text="",
         title="",
         page=0,
-        offset=0,
         # related_images=None,
         # related_files=None
     ):
@@ -178,8 +177,6 @@ class BaseChunker:
             embedding_text (str, optional): Text used to generate the embedding. Defaults to an empty string.
             title (str, optional): The title of the chunk. Defaults to an empty string.
             page (int, optional): The page number where the chunk is located. Defaults to 0.
-            offset (int, optional): The offset position of the chunk in the content. Defaults to 0.
-
 
         Returns:
             dict: A dictionary representing the chunk with all the attributes, including the embedding vector.
@@ -224,12 +221,9 @@ class BaseChunker:
             "date_uploaded": self.date_uploaded,  # Use the date from metadata
             "filepath": self.filename,
             "content": truncated_content,
-            "category": "",
-            "length": len(truncated_content),  # Length in characters
             "vector": content_vector,
             "title": self._extract_title_from_filename(self.filename) if not title else title,
             "page": page,
-            "offset": offset,     
         }
 
     def _get_date_uploaded_from_metadata(self):
