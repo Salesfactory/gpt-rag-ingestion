@@ -245,11 +245,8 @@ def get_chunk(content, url, page, chunk_id, text_embedder):
     chunk =  {
             "id": str(uuid4()),
             "chunk_id": chunk_id,
-            "offset": 0,
-            "length": 0,
             "page": page,                    
             "title": "default",
-            "category": "default",
             "metadata_storage_path": url,
             "filepath": url,
             "url": url,
