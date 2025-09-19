@@ -1,0 +1,312 @@
+"""
+Direct image extraction service for various document formats.
+Uses PyMuPDF for PDFs and other libraries for different document types.
+"""
+
+import base64
+import io
+import logging
+from importlib import import_module
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
+import zipfile
+
+
+def _load_optional_module(module_name: str, warning: str):
+    try:
+        return import_module(module_name)
+    except ImportError:
+        logging.warning(warning)
+        return None
+
+
+fitz = _load_optional_module("fitz", "PyMuPDF not available - PDF image extraction disabled")
+PYMUPDF_AVAILABLE = fitz is not None
+
+_pil_image_module = _load_optional_module("PIL.Image", "Pillow not available - image processing disabled")
+if _pil_image_module is not None:
+    Image = _pil_image_module
+    PIL_AVAILABLE = True
+else:
+    Image = None
+    PIL_AVAILABLE = False
+
+DOCX_SUPPORT = True
+
+
+class DirectImageExtractor:
+    """Extracts images directly from various document formats."""
+
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+
+    def extract_images_from_bytes(self, file_bytes: bytes, filename: str) -> List[Dict[str, Any]]:
+        """
+        Extract images from document bytes based on file extension.
+
+        Args:
+            file_bytes: Document bytes
+            filename: Original filename to determine format
+
+        Returns:
+            List of image dictionaries with format:
+            {
+                'image_id': str,
+                'page_number': int,
+                'image_data': bytes,
+                'format': str,
+                'bbox': Optional[Dict],
+                'size': Tuple[int, int]
+            }
+        """
+        try:
+            file_extension = Path(filename).suffix.lower()
+
+            if file_extension == '.pdf':
+                return self._extract_from_pdf(file_bytes)
+            elif file_extension in ['.docx', '.doc']:
+                return self._extract_from_docx(file_bytes)
+            elif file_extension in ['.pptx', '.ppt']:
+                return self._extract_from_pptx(file_bytes)
+            elif file_extension in ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff']:
+                return self._extract_from_image(file_bytes, filename)
+            else:
+                self.logger.info(f"No image extraction support for {file_extension}")
+                return []
+
+        except Exception as e:
+            self.logger.error(f"Error extracting images from {filename}: {str(e)}")
+            return []
+
+    def _extract_from_pdf(self, file_bytes: bytes) -> List[Dict[str, Any]]:
+        """Extract images from PDF using PyMuPDF."""
+        if not PYMUPDF_AVAILABLE:
+            self.logger.warning("PyMuPDF not available for PDF image extraction")
+            return []
+
+        images = []
+        try:
+            # Open PDF from bytes
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+
+            for page_num in range(len(doc)):
+                page = doc.load_page(page_num)
+                image_list = page.get_images()
+
+                for img_index, img in enumerate(image_list):
+                    try:
+                        # Get image data
+                        xref = img[0]
+                        pix = fitz.Pixmap(doc, xref)
+
+                        # Convert to RGB if CMYK
+                        if pix.n - pix.alpha < 4:
+                            img_data = pix.tobytes("png")
+                        else:
+                            pix1 = fitz.Pixmap(fitz.csRGB, pix)
+                            img_data = pix1.tobytes("png")
+                            pix1 = None
+
+                        # Get image properties
+                        image_dict = {
+                            'image_id': f"page_{page_num + 1}_img_{img_index + 1}",
+                            'page_number': page_num + 1,
+                            'image_data': img_data,
+                            'format': 'png',
+                            'size': (pix.width, pix.height),
+                            'bbox': {
+                                'x': 0,  # PyMuPDF doesn't provide exact positioning easily
+                                'y': 0,
+                                'width': pix.width,
+                                'height': pix.height
+                            }
+                        }
+
+                        images.append(image_dict)
+                        pix = None
+
+                    except Exception as e:
+                        self.logger.warning(f"Failed to extract image {img_index} from page {page_num}: {str(e)}")
+                        continue
+
+            doc.close()
+            self.logger.info(f"Extracted {len(images)} images from PDF")
+
+        except Exception as e:
+            self.logger.error(f"Error processing PDF: {str(e)}")
+
+        return images
+
+    def _extract_from_docx(self, file_bytes: bytes) -> List[Dict[str, Any]]:
+        """Extract images from DOCX files."""
+        if not DOCX_SUPPORT:
+            self.logger.warning("DOCX support not available")
+            return []
+
+        images = []
+        try:
+            with zipfile.ZipFile(io.BytesIO(file_bytes), 'r') as zip_file:
+                # Find image files in the DOCX
+                image_files = [f for f in zip_file.namelist() if f.startswith('word/media/')]
+
+                for idx, img_path in enumerate(image_files):
+                    try:
+                        img_data = zip_file.read(img_path)
+                        img_format = Path(img_path).suffix[1:].lower()  # Remove dot
+
+                        # Get image size if possible
+                        size = (0, 0)
+                        if PIL_AVAILABLE:
+                            try:
+                                with Image.open(io.BytesIO(img_data)) as pil_img:
+                                    size = pil_img.size
+                            except Exception:
+                                pass
+
+                        image_dict = {
+                            'image_id': f"docx_img_{idx + 1}",
+                            'page_number': 1,  # DOCX doesn't have clear page concept
+                            'image_data': img_data,
+                            'format': img_format,
+                            'size': size,
+                            'bbox': None
+                        }
+
+                        images.append(image_dict)
+
+                    except Exception as e:
+                        self.logger.warning(f"Failed to extract image {img_path}: {str(e)}")
+                        continue
+
+            self.logger.info(f"Extracted {len(images)} images from DOCX")
+
+        except Exception as e:
+            self.logger.error(f"Error processing DOCX: {str(e)}")
+
+        return images
+
+    def _extract_from_pptx(self, file_bytes: bytes) -> List[Dict[str, Any]]:
+        """Extract images from PPTX files."""
+        if not DOCX_SUPPORT:
+            self.logger.warning("PPTX support not available")
+            return []
+
+        images = []
+        try:
+            with zipfile.ZipFile(io.BytesIO(file_bytes), 'r') as zip_file:
+                # Find image files in the PPTX (usually in ppt/media/)
+                image_files = [f for f in zip_file.namelist() if f.startswith('ppt/media/')]
+
+                for idx, img_path in enumerate(image_files):
+                    try:
+                        img_data = zip_file.read(img_path)
+                        img_format = Path(img_path).suffix[1:].lower()  # Remove dot
+
+                        # Get image size if possible
+                        size = (0, 0)
+                        if PIL_AVAILABLE:
+                            try:
+                                with Image.open(io.BytesIO(img_data)) as pil_img:
+                                    size = pil_img.size
+                            except Exception:
+                                pass
+
+                        # Try to determine slide number from path (ppt/media/ images don't have clear slide association)
+                        slide_number = 1  # Default to slide 1
+
+                        image_dict = {
+                            'image_id': f"pptx_slide_{slide_number}_img_{idx + 1}",
+                            'page_number': slide_number,
+                            'image_data': img_data,
+                            'format': img_format,
+                            'size': size,
+                            'bbox': None
+                        }
+
+                        images.append(image_dict)
+
+                    except Exception as e:
+                        self.logger.warning(f"Failed to extract image {img_path}: {str(e)}")
+                        continue
+
+            self.logger.info(f"Extracted {len(images)} images from PPTX")
+
+        except Exception as e:
+            self.logger.error(f"Error processing PPTX: {str(e)}")
+
+        return images
+
+    def _extract_from_image(self, file_bytes: bytes, filename: str) -> List[Dict[str, Any]]:
+        """Handle single image files."""
+        if not PIL_AVAILABLE:
+            self.logger.warning("Pillow not available for image processing")
+            return []
+
+        try:
+            with Image.open(io.BytesIO(file_bytes)) as img:
+                # Convert to RGB if needed
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    img = img.convert('RGB')
+
+                # Save as PNG bytes
+                img_buffer = io.BytesIO()
+                img.save(img_buffer, format='PNG')
+                img_data = img_buffer.getvalue()
+
+                return [{
+                    'image_id': f"single_image",
+                    'page_number': 1,
+                    'image_data': img_data,
+                    'format': 'png',
+                    'size': img.size,
+                    'bbox': {
+                        'x': 0,
+                        'y': 0,
+                        'width': img.size[0],
+                        'height': img.size[1]
+                    }
+                }]
+
+        except Exception as e:
+            self.logger.error(f"Error processing image file: {str(e)}")
+            return []
+
+    def convert_to_normalized_format(self, extracted_images: List[Dict[str, Any]], source_url: str) -> List[Dict[str, Any]]:
+        """
+        Convert extracted images to the normalized format expected by ImageDescriptionClient.
+
+        Args:
+            extracted_images: List of images from extract_images_from_bytes
+            source_url: Source URL for the document
+
+        Returns:
+            List of normalized image dictionaries
+        """
+        normalized_images = []
+
+        for img in extracted_images:
+            try:
+                # Encode image data to base64
+                base64_data = base64.b64encode(img['image_data']).decode('utf-8')
+
+                normalized_img = {
+                    'id': img['image_id'],
+                    'pageNumber': img['page_number'],
+                    'data': base64_data,
+                    'contentType': f"image/{img['format']}",
+                    'sourceUrl': source_url,
+                    'boundingBox': img.get('bbox'),
+                    'size': {
+                        'width': img['size'][0],
+                        'height': img['size'][1]
+                    } if img['size'] != (0, 0) else None
+                }
+
+                normalized_images.append(normalized_img)
+
+            except Exception as e:
+                self.logger.warning(f"Failed to normalize image {img.get('image_id', 'unknown')}: {str(e)}")
+                continue
+
+        return normalized_images
