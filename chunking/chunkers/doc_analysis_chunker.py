@@ -204,7 +204,7 @@ class DocAnalysisChunker(BaseChunker):
     def _process_text_content_character_based(self, document_content):
         """
         Process document content using character-based chunking strategy.
-        Chunk size and overlap follow the configured token limits (NUM_TOKENS/TOKEN_OVERLAP).
+        Converts token-based configuration to approximate character limits.
 
         Args:
             document_content (str): Full document text content
@@ -215,9 +215,11 @@ class DocAnalysisChunker(BaseChunker):
         chunks = []
         chunk_id = 0
 
-        # Character-based chunking parameters sourced from configuration
-        chunk_size = self.max_chunk_size
-        overlap = self.token_overlap
+        # Convert token limits to approximate character limits
+        # Average ratio: ~4 characters per token for English text
+        chars_per_token = 4
+        chunk_size = self.max_chunk_size * chars_per_token
+        overlap = self.token_overlap * chars_per_token
 
         # Split content into character-based chunks
         start = 0
