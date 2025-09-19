@@ -358,7 +358,7 @@ def create_index_body(
                     "name": "vector-ce-vectorizer",
                     "kind": "azureOpenAI",
                     "azureOpenAIParameters": {
-                        "resourceUri": os.getenv("AZURE_OPENAI_ENDPOINT"),
+                        "resourceUri": f"https://{os.getenv('AZURE_OPENAI_SERVICE_NAME')}.openai.azure.com",
                         "deploymentId": "text-embedding-3-small",
                         "apiKey": os.getenv("AZURE_OPENAI_API_KEY"),
                         "modelName": "text-embedding-3-small",

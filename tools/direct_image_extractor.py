@@ -6,11 +6,13 @@ Uses PyMuPDF for PDFs and other libraries for different document types.
 import base64
 import io
 import logging
+import os
 from importlib import import_module
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import zipfile
+from xml.etree import ElementTree as ET
 
 
 def _load_optional_module(module_name: str, warning: str):
@@ -195,15 +197,81 @@ class DirectImageExtractor:
         images = []
         try:
             with zipfile.ZipFile(io.BytesIO(file_bytes), 'r') as zip_file:
-                # Find image files in the PPTX (usually in ppt/media/)
-                image_files = [f for f in zip_file.namelist() if f.startswith('ppt/media/')]
+                slide_files = [
+                    name for name in zip_file.namelist()
+                    if name.startswith('ppt/slides/slide') and name.endswith('.xml')
+                ]
 
-                for idx, img_path in enumerate(image_files):
+                if not slide_files:
+                    self.logger.warning("No slide files found in PPTX")
+                    return []
+
+                def slide_sort_key(slide_path: str) -> int:
                     try:
-                        img_data = zip_file.read(img_path)
-                        img_format = Path(img_path).suffix[1:].lower()  # Remove dot
+                        stem = Path(slide_path).stem
+                        return int(stem.replace('slide', ''))
+                    except ValueError:
+                        return 0
 
-                        # Get image size if possible
+                slide_files.sort(key=slide_sort_key)
+
+                rel_ns = '{http://schemas.openxmlformats.org/package/2006/relationships}'
+                rel_type_image = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image'
+                r_ns = '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}'
+                namespaces = {
+                    'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+                    'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
+                }
+
+                per_slide_counts: Dict[int, int] = {}
+
+                for slide_index, slide_path in enumerate(slide_files, start=1):
+                    try:
+                        slide_xml = ET.fromstring(zip_file.read(slide_path))
+                    except KeyError:
+                        self.logger.warning(f"Slide file {slide_path} missing from PPTX")
+                        continue
+
+                    rels_path = slide_path.replace('slides/', 'slides/_rels/').replace('.xml', '.xml.rels')
+                    rels_map: Dict[str, str] = {}
+
+                    if rels_path in zip_file.namelist():
+                        try:
+                            rels_root = ET.fromstring(zip_file.read(rels_path))
+                            for rel in rels_root.findall(f'{rel_ns}Relationship'):
+                                if rel.attrib.get('Type') != rel_type_image:
+                                    continue
+                                rel_id = rel.attrib.get('Id')
+                                target = rel.attrib.get('Target')
+                                if not rel_id or not target:
+                                    continue
+                                resolved = os.path.normpath(os.path.join(os.path.dirname(slide_path), target))
+                                rels_map[rel_id] = resolved.replace('\\', '/')
+                        except Exception as rel_error:
+                            self.logger.warning(f"Failed to parse relationships for {slide_path}: {rel_error}")
+
+                    slide_images: List[str] = []
+                    seen_media: set[str] = set()
+                    for blip in slide_xml.findall('.//a:blip', namespaces):
+                        rel_id = blip.attrib.get(f'{r_ns}embed')
+                        if not rel_id:
+                            continue
+                        media_path = rels_map.get(rel_id)
+                        if media_path and media_path.startswith('ppt/') and media_path not in seen_media:
+                            slide_images.append(media_path)
+                            seen_media.add(media_path)
+
+                    per_slide_counts.setdefault(slide_index, 0)
+
+                    for media_path in slide_images:
+                        try:
+                            img_data = zip_file.read(media_path)
+                        except KeyError:
+                            self.logger.warning(f"Image {media_path} referenced by {slide_path} missing in archive")
+                            continue
+
+                        img_format = Path(media_path).suffix[1:].lower() or 'png'
+
                         size = (0, 0)
                         if PIL_AVAILABLE:
                             try:
@@ -212,12 +280,12 @@ class DirectImageExtractor:
                             except Exception:
                                 pass
 
-                        # Try to determine slide number from path (ppt/media/ images don't have clear slide association)
-                        slide_number = 1  # Default to slide 1
+                        per_slide_counts[slide_index] += 1
+                        sequence = per_slide_counts[slide_index]
 
                         image_dict = {
-                            'image_id': f"pptx_slide_{slide_number}_img_{idx + 1}",
-                            'page_number': slide_number,
+                            'image_id': f"pptx_slide_{slide_index}_img_{sequence}",
+                            'page_number': slide_index,
                             'image_data': img_data,
                             'format': img_format,
                             'size': size,
@@ -225,10 +293,6 @@ class DirectImageExtractor:
                         }
 
                         images.append(image_dict)
-
-                    except Exception as e:
-                        self.logger.warning(f"Failed to extract image {img_path}: {str(e)}")
-                        continue
 
             self.logger.info(f"Extracted {len(images)} images from PPTX")
 
@@ -300,7 +364,12 @@ class DirectImageExtractor:
                     'size': {
                         'width': img['size'][0],
                         'height': img['size'][1]
-                    } if img['size'] != (0, 0) else None
+                    } if img['size'] != (0, 0) else None,
+                    'locationMetadata': {
+                        'pageNumber': img['page_number'],
+                        'ordinalPosition': 1,  # Default since we don't track position within page
+                        'boundingPolygons': img.get('bbox', {})
+                    }
                 }
 
                 normalized_images.append(normalized_img)

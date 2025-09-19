@@ -167,8 +167,15 @@ class DocAnalysisChunker(BaseChunker):
             if not document_content:
                 logging.warning(f"[doc_analysis_chunker][{self.filename}] No text content found")
 
-            # Process text chunks using character-based splitting
-            text_chunks = self._process_text_content_character_based(document_content)
+            # Debug: Check if PageBreaks exist in content
+            pagebreak_count = document_content.count('<!-- PageBreak -->')
+            logging.debug(f"[doc_analysis_chunker][{self.filename}] Found {pagebreak_count} PageBreak markers in content")
+
+            # Number pagebreaks for proper page tracking
+            document_content = self._number_pagebreaks(document_content)
+
+            # Process text chunks using character-based splitting with page info from document
+            text_chunks = self._process_text_content_character_based(document_content, document)
 
             # Extract images directly using PyMuPDF and other libraries
             extracted_images = self.direct_image_extractor.extract_images_from_bytes(
@@ -201,13 +208,14 @@ class DocAnalysisChunker(BaseChunker):
             logging.info(f"[doc_analysis_chunker][{self.filename}] Falling back to traditional processing")
             return await self._get_traditional_chunks()
 
-    def _process_text_content_character_based(self, document_content):
+    def _process_text_content_character_based(self, document_content, document=None):
         """
         Process document content using character-based chunking strategy.
         Converts token-based configuration to approximate character limits.
 
         Args:
             document_content (str): Full document text content
+            document (dict): Document analysis result with page information
 
         Returns:
             list: Processed text chunks
@@ -221,9 +229,14 @@ class DocAnalysisChunker(BaseChunker):
         chunk_size = self.max_chunk_size * chars_per_token
         overlap = self.token_overlap * chars_per_token
 
-        # Split content into character-based chunks
+        # Check if PageBreaks exist, if not use alternative page estimation
+        has_pagebreaks = '<!-- PageBreak' in document_content
+        logging.debug(f"[doc_analysis_chunker][{self.filename}] PageBreaks available: {has_pagebreaks}")
+
+        # Split content into character-based chunks with page tracking
         start = 0
         content_length = len(document_content)
+        current_page = 1
 
         while start < content_length:
             # Calculate end position for this chunk
@@ -237,6 +250,17 @@ class DocAnalysisChunker(BaseChunker):
                 start = end - overlap if end < content_length else end
                 continue
 
+            # Determine page number
+            if has_pagebreaks:
+                # Use existing PageBreak tracking
+                current_page = self._update_page(chunk_content, current_page)
+                chunk_page = self._determine_chunk_page(chunk_content, current_page)
+            else:
+                # Estimate page based on character position and typical page length
+                # Assume ~2000 characters per page (rough estimate)
+                estimated_page = max(1, (start // 2000) + 1)
+                chunk_page = estimated_page
+
             # Check minimum size requirement (convert to tokens for consistency)
             num_tokens = self.token_estimator.estimate_tokens(chunk_content)
             if num_tokens >= self.minimum_chunk_size:
@@ -244,12 +268,13 @@ class DocAnalysisChunker(BaseChunker):
                 chunk = self._create_chunk(
                     chunk_id=chunk_id,
                     content=chunk_content.strip(),
-                    page=1,  # Page tracking would need enhancement for character-based chunks
+                    page=chunk_page,  # Now uses proper page tracking or estimation
                     chunk_type='text',
                     location_metadata={
                         'start_char': start,
                         'end_char': end,
-                        'chunk_method': 'character_based'
+                        'chunk_method': 'character_based',
+                        'page_estimation_method': 'pagebreak' if has_pagebreaks else 'character_position'
                     }
                 )
                 chunks.append(chunk)
@@ -309,10 +334,17 @@ class DocAnalysisChunker(BaseChunker):
                 # Use the original image ID as chunk_id for consistency across pipeline
                 original_image_id = img.get('id', f"img_{i+1}")
 
+                # Get page number from multiple possible locations
+                page_number = (
+                    location_metadata.get('pageNumber') or
+                    img.get('pageNumber') or
+                    1
+                )
+
                 chunk = self._create_chunk(
                     chunk_id=original_image_id,
                     content=description,
-                    page=location_metadata.get('pageNumber', 1),
+                    page=page_number,
                     chunk_type='image',
                     location_metadata=location_metadata,
                     image_url=image_url,

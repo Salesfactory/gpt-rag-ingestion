@@ -5,6 +5,7 @@ import logging
 import base64
 import hashlib
 import time
+import json
 from typing import Dict, Any, Optional, List
 from urllib.parse import urlparse
 from azure.storage.blob import BlobServiceClient
@@ -142,10 +143,19 @@ class MultimodalBlobClient:
 
             # Add location metadata if provided
             if location_metadata:
+                bounding_polygons = location_metadata.get('boundingPolygons')
+                if bounding_polygons is not None:
+                    try:
+                        bounding_polygons_value = json.dumps(bounding_polygons)
+                    except TypeError:
+                        bounding_polygons_value = str(bounding_polygons)
+                else:
+                    bounding_polygons_value = ''
+
                 blob_metadata.update({
                     'page_number': str(location_metadata.get('pageNumber', 0)),
                     'ordinal_position': str(location_metadata.get('ordinalPosition', 0)),
-                    'bounding_polygons': location_metadata.get('boundingPolygons', '')
+                    'bounding_polygons': bounding_polygons_value
                 })
 
             # Upload blob

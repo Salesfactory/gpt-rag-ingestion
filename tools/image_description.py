@@ -50,13 +50,13 @@ Figure: "A labeled diagram illustrating the components of a transformer model, i
         Initializes the ImageDescriptionClient.
         """
         # Azure OpenAI configuration
-        self.azure_openai_endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
+        self.azure_openai_endpoint = f"https://{os.getenv('AZURE_OPENAI_SERVICE_NAME')}.openai.azure.com"
         self.chat_deployment = os.getenv('AZURE_OPENAI_CHAT_DEPLOYMENT', 'Agent')
         self.api_version = os.getenv('AZURE_OPENAI_API_VERSION', '2025-01-01-preview')
 
         if not self.azure_openai_endpoint:
-            logging.error("[image_description] AZURE_OPENAI_ENDPOINT environment variable not set.")
-            raise EnvironmentError("AZURE_OPENAI_ENDPOINT environment variable not set.")
+            logging.error("[image_description] AZURE_OPENAI_SERVICE_NAME environment variable not set.")
+            raise EnvironmentError("AZURE_OPENAI_SERVICE_NAME environment variable not set.")
 
         # Processing configuration
         self.batch_size = int(os.getenv('IMAGE_DESCRIPTION_BATCH_SIZE', '5'))
