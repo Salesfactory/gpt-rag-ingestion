@@ -246,7 +246,7 @@ Figure: "A labeled diagram illustrating the components of a transformer model, i
 
             logging.debug(f"[image_description] Processing batch {i // self.batch_size + 1} with {len(batch)} images")
 
-            # Use ThreadPoolExecutor for parallel processing
+            # Use ThreadPoolExecutor for parallel processing while preserving ID mapping
             with ThreadPoolExecutor(max_workers=min(len(batch), 5)) as executor:
                 # Submit all tasks
                 future_to_image = {
@@ -257,10 +257,14 @@ Figure: "A labeled diagram illustrating the components of a transformer model, i
                     ): img for img in batch
                 }
 
-                # Collect results
+                # Collect results and preserve image ID association
                 batch_results = []
                 for future in as_completed(future_to_image):
                     result = future.result()
+                    original_image = future_to_image[future]
+
+                    # Include the original image ID in the result for mapping
+                    result['original_image_id'] = original_image.get('id')
                     batch_results.append(result)
 
                 results.extend(batch_results)
@@ -304,22 +308,33 @@ Figure: "A labeled diagram illustrating the components of a transformer model, i
         # Get descriptions
         description_results = self.describe_images_batch(images_for_description)
 
-        # Merge descriptions back into original image objects
-        enhanced_images = []
-        for i, img in enumerate(normalized_images):
-            enhanced_img = img.copy()
+        # Create a mapping from image ID to description result for correct matching
+        id_to_description = {}
+        for result in description_results:
+            image_id = result.get('original_image_id')
+            if image_id:
+                id_to_description[image_id] = result
 
-            if i < len(description_results):
-                result = description_results[i]
+        # Merge descriptions back into original image objects by ID (not index)
+        enhanced_images = []
+        for img in normalized_images:
+            enhanced_img = img.copy()
+            image_id = img.get('id')
+
+            # Find the matching description by image ID
+            result = id_to_description.get(image_id)
+            if result:
                 if result.get('success'):
                     enhanced_img['description'] = result['description']
                     enhanced_img['description_status'] = 'success'
+                    logging.debug(f"[image_description] Matched description for {image_id}: {len(result['description'])} chars")
                 else:
                     enhanced_img['description'] = f"Error generating description: {result.get('error', 'Unknown error')}"
                     enhanced_img['description_status'] = 'error'
             else:
                 enhanced_img['description'] = "Description not generated"
                 enhanced_img['description_status'] = 'skipped'
+                logging.warning(f"[image_description] No description found for image ID: {image_id}")
 
             enhanced_images.append(enhanced_img)
 
