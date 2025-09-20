@@ -102,8 +102,14 @@ class MultimodalBlobClient:
 
         return image_path
 
-    def store_image(self, image_data: str, document_url: str, image_id: str,
-                   location_metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def store_image(
+        self,
+        image_data: str,
+        document_url: str,
+        image_id: str,
+        location_metadata: Optional[Dict[str, Any]] = None,
+        organization_id: str = "",
+    ) -> Dict[str, Any]:
         """
         Store an extracted image in blob storage.
 
@@ -140,6 +146,9 @@ class MultimodalBlobClient:
                 'content_type': 'image/jpeg',
                 'extraction_timestamp': str(int(time.time()))
             }
+
+            if organization_id:
+                blob_metadata['organization_id'] = organization_id
 
             # Add location metadata if provided
             if location_metadata:
@@ -193,7 +202,12 @@ class MultimodalBlobClient:
                 'image_id': image_id
             }
 
-    def store_images_batch(self, images: List[Dict[str, Any]], document_url: str) -> List[Dict[str, Any]]:
+    def store_images_batch(
+        self,
+        images: List[Dict[str, Any]],
+        document_url: str,
+        organization_id: str = "",
+    ) -> List[Dict[str, Any]]:
         """
         Store multiple images from normalized_images array.
 
@@ -224,7 +238,13 @@ class MultimodalBlobClient:
                 })
                 continue
 
-            result = self.store_image(image_data, document_url, image_id, location_metadata)
+            result = self.store_image(
+                image_data,
+                document_url,
+                image_id,
+                location_metadata,
+                organization_id=organization_id,
+            )
             results.append(result)
 
         success_count = sum(1 for r in results if r.get('success', False))

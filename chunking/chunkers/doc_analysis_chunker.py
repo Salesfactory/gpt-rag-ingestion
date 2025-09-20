@@ -7,6 +7,7 @@ from langchain.text_splitter import MarkdownTextSplitter, RecursiveCharacterText
 from .base_chunker import BaseChunker
 from ..exceptions import UnsupportedFormatError, DocAnalysisError
 from tools import DocumentIntelligenceClient, ImageDescriptionClient, MultimodalBlobClient
+from tools.blob import BlobStorageClient
 from tools.direct_image_extractor import DirectImageExtractor
 
 from azure.core.credentials import AzureKeyCredential
@@ -302,6 +303,20 @@ class DocAnalysisChunker(BaseChunker):
             return []
 
         chunks = []
+        organization_id = ""
+
+        try:
+            blob_client = BlobStorageClient(self.file_url)
+            metadata = blob_client.get_metadata()
+            organization_id = metadata.get('organization_id', '') if metadata else ''
+            if organization_id:
+                logging.debug(
+                    f"[doc_analysis_chunker][{self.filename}] Using organization_id from metadata: {organization_id}"
+                )
+        except Exception as exc:
+            logging.warning(
+                f"[doc_analysis_chunker][{self.filename}] Unable to retrieve organization_id metadata: {exc}"
+            )
 
         try:
             # Generate descriptions for all images
@@ -310,7 +325,8 @@ class DocAnalysisChunker(BaseChunker):
             # Store images in blob storage
             storage_results = self.multimodal_blob_client.store_images_batch(
                 described_images,
-                self.url or f"file://{self.filename}"
+                self.url or f"file://{self.filename}",
+                organization_id=organization_id,
             )
 
             # Create chunks for each image
@@ -350,6 +366,8 @@ class DocAnalysisChunker(BaseChunker):
                     image_url=image_url,
                     image_id=original_image_id
                 )
+                if organization_id:
+                    chunk['organization_id'] = organization_id
                 chunks.append(chunk)
 
             logging.debug(f"[doc_analysis_chunker][{self.filename}] Created {len(chunks)} image chunks")
