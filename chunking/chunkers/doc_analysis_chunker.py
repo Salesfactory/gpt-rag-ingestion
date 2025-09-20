@@ -325,7 +325,8 @@ class DocAnalysisChunker(BaseChunker):
             # Store images in blob storage
             storage_results = self.multimodal_blob_client.store_images_batch(
                 described_images,
-                self.url or f"file://{self.filename}"
+                self.url or f"file://{self.filename}",
+                organization_id=organization_id,
             )
 
             # Create chunks for each image
