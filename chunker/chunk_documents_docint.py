@@ -28,8 +28,8 @@ TOKEN_OVERLAP = int(os.environ["TOKEN_OVERLAP"])
 
 # Doc int version
 DOCINT_40_API = '2023-10-31-preview'
-default_api_version = '2023-07-31'
-DOCINT_API_VERSION = os.getenv('FORM_REC_API_VERSION', os.getenv('DOCINT_API_VERSION', default_api_version))
+default_api_version = '2024-11-30'
+DOCINT_API_VERSION = os.getenv('FORM_REC_API_VERSION', default_api_version)
 
 # Network isolation active?
 NETWORK_ISOLATION = os.environ["NETWORK_ISOLATION"]
@@ -245,11 +245,8 @@ def get_chunk(content, url, page, chunk_id, text_embedder):
     chunk =  {
             "id": str(uuid4()),
             "chunk_id": chunk_id,
-            "offset": 0,
-            "length": 0,
             "page": page,                    
             "title": "default",
-            "category": "default",
             "metadata_storage_path": url,
             "filepath": url,
             "url": url,

@@ -5,3 +5,5 @@ from .blob import BlobStorageClient
 from .keyvault import KeyVaultClient
 from .aisearch import AISearchClient
 from .doc_intelligence import DocumentIntelligenceClient
+from .image_description import ImageDescriptionClient
+from .multimodal_blob import MultimodalBlobClient

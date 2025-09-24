@@ -1,3 +1,4 @@
+# test change
 import logging
 import json
 # import asyncio
@@ -71,7 +72,7 @@ async def document_chunking(req: func.HttpRequest) -> func.HttpResponse:
             filename = ""
             if count_items > 1:
                 logging.warning('BatchSize should be set to 1 in the Skillset definition. Processing only the last item.')
-            for i, item in enumerate(body["values"]):
+            for _, item in enumerate(body["values"]):
                 input_data = item["data"]
                 filename = get_filename(input_data["documentUrl"])
                 logging.info(f'[document_chunking_function] Chunking document: File {filename}, Content Type {input_data["documentContentType"]}.')
@@ -87,13 +88,32 @@ async def document_chunking(req: func.HttpRequest) -> func.HttpResponse:
             # Chunk the document
             chunks, errors, warnings = await DocumentChunker().chunk_documents(input_data)
          
-            # Debug logging
+            # Debug logging and multimodal summary
+            text_chunks = 0
+            image_chunks = 0
             for idx, chunk in enumerate(chunks):
+                chunk_type = chunk.get('type', 'text')
+                if chunk_type == 'image':
+                    image_chunks += 1
+                else:
+                    text_chunks += 1
+
                 processed_chunk = chunk.copy()
                 processed_chunk.pop('vector', None)
                 if 'content' in processed_chunk and isinstance(processed_chunk['content'], str):
                     processed_chunk['content'] = processed_chunk['content'][:100]
-                logging.debug(f"[document_chunking][{filename}] Chunk {idx + 1}: {json.dumps(processed_chunk, indent=4)}")
+
+                # Add multimodal specific info to debug output
+                if chunk_type == 'image':
+                    image_url = chunk.get('image_url', 'Not available')
+                    if image_url and image_url != 'Not available':
+                        processed_chunk['image_url_preview'] = image_url[:100]
+                    else:
+                        processed_chunk['image_url_preview'] = 'Not available'
+
+                logging.debug(f"[document_chunking][{filename}] {chunk_type.title()} Chunk {idx + 1}: {json.dumps(processed_chunk, indent=4)}")
+
+            logging.info(f"[document_chunking][{filename}] Generated {len(chunks)} total chunks: {text_chunks} text, {image_chunks} image")
 
 
             # Format results

@@ -39,11 +39,9 @@ class LocalPdfParser(Parser):
 
         reader = PdfReader(content)
         pages = reader.pages
-        offset = 0
         for page_num, p in enumerate(pages):
             page_text = p.extract_text()
-            yield Page(page_num=page_num, offset=offset, text=page_text)
-            offset += len(page_text)
+            yield Page(page_num=page_num, text=page_text)
 
 
 class DocumentAnalysisParser(Parser):
@@ -112,7 +110,6 @@ class DocumentAnalysisParser(Parser):
                     model_id=self.model_id, analyze_request=content, content_type="application/octet-stream"
                 )
             analyze_result: AnalyzeResult = await poller.result()
-            offset = 0
             for page in analyze_result.pages:
                 tables_on_page = [
                     table
@@ -180,8 +177,7 @@ class DocumentAnalysisParser(Parser):
                 page_text = page_text.replace("<!-- PageBreak -->", "")
                 # We remove excess newlines at the beginning and end of the page
                 page_text = page_text.strip()
-                yield Page(page_num=page.page_number - 1, offset=offset, text=page_text)
-                offset += len(page_text)
+                yield Page(page_num=page.page_number - 1, text=page_text)
 
     @staticmethod
     async def figure_to_html(

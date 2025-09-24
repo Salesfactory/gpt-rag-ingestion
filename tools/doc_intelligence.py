@@ -6,7 +6,7 @@ import json
 import logging
 import requests
 from urllib.parse import urlparse, unquote
-from azure.identity import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential
+from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 from azure.core.exceptions import ClientAuthenticationError, ResourceNotFoundError
 
@@ -36,13 +36,17 @@ class DocumentIntelligenceClient:
 
         # API configuration
         self.DOCINT_40_API = '2023-10-31-preview'
-        self.DEFAULT_API_VERSION = '2023-07-31'
-        self.api_version = os.getenv('FORM_REC_API_VERSION', os.getenv('DOCINT_API_VERSION', self.DEFAULT_API_VERSION))
+        self.api_version = os.getenv('FORM_REC_API_VERSION', '2024-11-30')
         self.docint_40_api = self.api_version >= self.DOCINT_40_API
 
         # Network isolation
         network_isolation = os.getenv('NETWORK_ISOLATION', 'false')
         self.network_isolation = network_isolation.lower() == 'true'
+
+        # Multimodal configuration
+        self.multimodal_enabled = os.getenv('MULTIMODAL_PROCESSING_ENABLED', 'true').lower() == 'true'
+        self.max_chunk_size = int(os.getenv('NUM_TOKENS', '650'))
+        self.chunk_overlap = int(os.getenv('TOKEN_OVERLAP', '125'))
 
         # Supported extensions
         self.file_extensions = [
@@ -54,24 +58,27 @@ class DocumentIntelligenceClient:
         ]
         self.ai_service_type = "formrecognizer"
         self.output_content_format = ""
-        self.docint_features = "" 
+        self.docint_features = ""
         self.analyze_output_options = ""
+        self.extraction_options = []
 
         if self.docint_40_api:
             self.ai_service_type = "documentintelligence"
             self.file_extensions.extend(["docx", "pptx", "xlsx", "html"])
-            self.output_content_format = "markdown"            
-            self.analyze_output_options = "figures"
 
-        # Initialize the ChainedTokenCredential with ManagedIdentityCredential and AzureCliCredential
+            # Configure for multimodal processing
+            if self.multimodal_enabled:
+                self.output_content_format = "text"  # Use text format for chunking
+                self.extraction_options = ["images", "locationMetadata"]
+            else:
+                self.output_content_format = "markdown"
+                self.analyze_output_options = "figures"
+
         try:
-            self.credential = ChainedTokenCredential(
-                ManagedIdentityCredential(),
-                AzureCliCredential()
-            )
-            logging.debug("[docintelligence] Initialized ChainedTokenCredential with ManagedIdentityCredential and AzureCliCredential.")
+            self.credential = DefaultAzureCredential()
+            logging.debug("[docintelligence] Initialized DefaultAzureCredential.")
         except Exception as e:
-            logging.error(f"[docintelligence] Failed to initialize ChainedTokenCredential: {e}")
+            logging.error(f"[docintelligence] Failed to initialize DefaultAzureCredential: {e}")
             raise
 
     def _get_file_extension(self, filepath):

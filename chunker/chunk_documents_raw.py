@@ -57,11 +57,8 @@ def chunk_document(data):
             "id": str(uuid4()),
             "filepath": get_filename(data['documentUrl']),
             "chunk_id": chunk.embedding_metadata['index'], # type: ignore
-            "offset": chunk.embedding_metadata['offset'],  # type: ignore
             "page": chunk.embedding_metadata['page'],  # type: ignore            
-            "length": chunk.embedding_metadata['length'],  # type: ignore
             "title": chunk.title,
-            "category": "default",
             "metadata_storage_path": data['documentUrl'],
             "url": data['documentUrl'],
             "metadata_storage_name": get_filename(data['documentUrl']),

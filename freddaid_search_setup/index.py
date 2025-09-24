@@ -4,6 +4,9 @@ import os
 import requests
 from typing import Optional
 import json
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # set up logging configuration globally
 # logging.getLogger("azure").setLevel(logging.WARNING)
@@ -19,7 +22,7 @@ logging.basicConfig(
 # Constants
 ########################################################
 
-document_chunking_func_key = os.getenv("DOCUMENT_CHUNKING_FUNCTION_KEY")
+document_chunking_func_key = os.getenv("DOCUMENT_CHUNKING_FUNCTION_KEY", "")
 cognitive_service_key = os.getenv("COGNITIVE_SERVICES_KEY")
 storage_connection_string = os.getenv("STORAGE_CONNECTION_STRING")
 search_api_version = "2024-11-01-preview"
@@ -188,44 +191,7 @@ def create_index_body(
                 "synonymMaps": [],
             },
             {
-                "name": "offset",
-                "type": "Edm.Int64",
-                "searchable": False,
-                "filterable": False,
-                "retrievable": True,
-                "stored": True,
-                "sortable": True,
-                "facetable": True,
-                "key": False,
-                "synonymMaps": [],
-            },
-            {
-                "name": "length",
-                "type": "Edm.Int32",
-                "searchable": False,
-                "filterable": False,
-                "retrievable": True,
-                "stored": True,
-                "sortable": True,
-                "facetable": True,
-                "key": False,
-                "synonymMaps": [],
-            },
-            {
                 "name": "title",
-                "type": "Edm.String",
-                "searchable": True,
-                "filterable": True,
-                "retrievable": True,
-                "stored": True,
-                "sortable": True,
-                "facetable": True,
-                "key": False,
-                "analyzer": "standard.lucene",
-                "synonymMaps": [],
-            },
-            {
-                "name": "category",
                 "type": "Edm.String",
                 "searchable": True,
                 "filterable": True,
@@ -361,7 +327,7 @@ def create_index_body(
                     "name": "my-semantic-config",
                     "prioritizedFields": {
                         "prioritizedContentFields": [{"fieldName": "content"}],
-                        "prioritizedKeywordsFields": [{"fieldName": "category"}],
+                        "prioritizedKeywordsFields": [],
                         "titleField": {"fieldName": "title"},
                     },
                 }
@@ -392,7 +358,7 @@ def create_index_body(
                     "name": "vector-ce-vectorizer",
                     "kind": "azureOpenAI",
                     "azureOpenAIParameters": {
-                        "resourceUri": os.getenv("AZURE_OPENAI_ENDPOINT"),
+                        "resourceUri": f"https://{os.getenv('AZURE_OPENAI_SERVICE_NAME')}.openai.azure.com",
                         "deploymentId": "text-embedding-3-small",
                         "apiKey": os.getenv("AZURE_OPENAI_API_KEY"),
                         "modelName": "text-embedding-3-small",

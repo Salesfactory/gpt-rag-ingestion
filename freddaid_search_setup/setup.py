@@ -8,7 +8,9 @@ from index import create_index_body
 from datasource import create_datasource
 from skillset import create_skillset
 from indexer import create_indexer_body
+from dotenv import load_dotenv
 
+load_dotenv()
 
 # set up logging configuration globally
 # logging.getLogger("azure").setLevel(logging.WARNING)
@@ -24,14 +26,14 @@ logging.basicConfig(
 # Variables & Constants
 ########################################################
 
-document_chunking_func_key = os.getenv("DOCUMENT_CHUNKING_FUNCTION_KEY")
+document_chunking_func_key = os.getenv("DOCUMENT_CHUNKING_FUNCTION_KEY", "")
 cognitive_service_key = os.getenv("COGNITIVE_SERVICES_KEY")
 storage_connection_string = os.getenv("STORAGE_CONNECTION_STRING")
 search_api_version = "2024-11-01-preview"
 azure_search_admin_key = os.getenv("AZURE_SEARCH_ADMIN_KEY")
 search_service_name = os.getenv("AZURE_SEARCH_SERVICE_NAME")
 azure_openai_api_key = os.getenv("AZURE_OPENAI_API_KEY")
-function_endpoint = "https://document-chunking-az-func.azurewebsites.net"
+function_endpoint = "https://fninges0-vm2b2htvuuclm.azurewebsites.net"
 
 
 ########################################################
