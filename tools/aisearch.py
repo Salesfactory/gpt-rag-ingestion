@@ -151,7 +151,7 @@ class AISearchClient:
         top: int = 10,
         skip: int = 0,
         order_by: Optional[str] = None,
-        filter_str: Optional[str] = None  # <-- Add this
+        filter_str: Optional[str] = None
     ) -> Dict[str, Any]:
         client = await self.get_search_client(index_name)
         try:

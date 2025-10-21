@@ -1,5 +1,3 @@
-# MultimodalBlobClient.py
-
 import os
 import logging
 import base64
