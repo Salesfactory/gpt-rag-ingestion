@@ -72,17 +72,17 @@ class DocumentIntelligenceClient:
                 # 'figures' detects visual elements (including charts/graphs rendered as vectors)
                 # while 'images' only extracts embedded raster images (logos, icons)
                 self.output_content_format = (
-                    "markdown"  # Markdown format for better structure
+                    "text"  # Plain text format without HTML tags
                 )
                 self.analyze_output_options = (
                     "figures"  # Detect charts, graphs, diagrams
                 )
                 # Note: Not using extraction_options=["images"] as that only gets embedded images
                 logging.info(
-                    "[docintelligence] Multimodal enabled: using 'figures' output for chart/graph detection"
+                    "[docintelligence] Multimodal enabled: using 'figures' output for chart/graph detection with text format"
                 )
             else:
-                self.output_content_format = "markdown"
+                self.output_content_format = "text"
                 self.analyze_output_options = "figures"
 
         try:
