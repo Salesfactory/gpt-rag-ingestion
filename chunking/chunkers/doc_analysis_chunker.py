@@ -456,7 +456,7 @@ class DocAnalysisChunker(BaseChunker):
                     # Extract bounding box from polygon (coordinates in inches for PDFs)
                     # Polygon format: [x0, y0, x1, y1, x2, y2, x3, y3]
                     # Vertices clockwise: top-left, top-right, bottom-right, bottom-left
-                    bounding_box = (
+                    bounding_box_raw = (
                         polygon[0],  # x0 (left) - from top-left vertex
                         polygon[1],  # y0 (top) - from top-left vertex
                         polygon[4],  # x1 (right) - from bottom-right vertex
@@ -466,14 +466,24 @@ class DocAnalysisChunker(BaseChunker):
                         bounding_region.get("pageNumber", 1) - 1
                     )  # Convert to 0-indexed
 
-                    # Calculate figure dimensions in inches
+                    # Add padding to capture axis labels, titles, and legends
+                    padding_inches = float(os.getenv("FIGURE_PADDING_INCHES", "1.0"))
+                    bounding_box = (
+                        max(0, bounding_box_raw[0] - padding_inches),  # x0 - left
+                        max(0, bounding_box_raw[1] - padding_inches),  # y0 - top
+                        bounding_box_raw[2] + padding_inches,  # x1 - right
+                        bounding_box_raw[3] + padding_inches,  # y1 - bottom
+                    )
+
+                    # Calculate figure dimensions in inches (after padding)
                     width_inches = bounding_box[2] - bounding_box[0]
                     height_inches = bounding_box[3] - bounding_box[1]
 
                     logging.debug(
-                        f"[doc_analysis_chunker][{self.filename}] Figure {fig_idx}: page {page_number}, "
-                        f"bbox=({bounding_box[0]:.2f}, {bounding_box[1]:.2f}, {bounding_box[2]:.2f}, {bounding_box[3]:.2f}) inches, "
-                        f"size={width_inches:.2f}x{height_inches:.2f} inches"
+                        f"[doc_analysis_chunker][{self.filename}] Figure {fig_idx}: page {page_number + 1}, "
+                        f"raw_bbox=({bounding_box_raw[0]:.2f}, {bounding_box_raw[1]:.2f}, {bounding_box_raw[2]:.2f}, {bounding_box_raw[3]:.2f}), "
+                        f"padded_bbox=({bounding_box[0]:.2f}, {bounding_box[1]:.2f}, {bounding_box[2]:.2f}, {bounding_box[3]:.2f}), "
+                        f'size={width_inches:.2f}x{height_inches:.2f} inches (padding={padding_inches}")'
                     )
 
                     # Filter out small figures (likely logos/icons)
@@ -540,6 +550,35 @@ class DocAnalysisChunker(BaseChunker):
 
         return normalized_images
 
+    def _should_skip_image(self, description: str) -> bool:
+        """
+        Determine if an image should be skipped from indexing.
+
+        Args:
+            description (str): Image description text
+
+        Returns:
+            bool: True if image should be skipped, False otherwise
+        """
+        if not description:
+            return True
+
+        description_lower = description.strip().lower()
+
+        # Skip non-important images (logos, icons, decorative elements)
+        if description_lower == "not an important image.":
+            return True
+
+        # Skip images with failed descriptions
+        if description.startswith("Error generating description:"):
+            return True
+
+        # Skip images where description was not generated
+        if description == "Description not generated":
+            return True
+
+        return False
+
     async def _process_image_sections(self, normalized_images):
         """
         Process images from Document Layout analysis into chunks.
@@ -575,31 +614,39 @@ class DocAnalysisChunker(BaseChunker):
                 normalized_images
             )
 
-            # Store images in blob storage
+            # Filter out images that should not be indexed BEFORE storage
+            # This prevents both indexing and unnecessary blob storage
+            filtered_images = []
+            skipped_count = 0
+            for img in described_images:
+                description = img.get("description", "")
+                if self._should_skip_image(description):
+                    logging.info(
+                        f"[doc_analysis_chunker][{self.filename}] Skipping image {img.get('id')} - "
+                        f"reason: {description[:80]}"
+                    )
+                    skipped_count += 1
+                    continue
+                filtered_images.append(img)
+
+            logging.info(
+                f"[doc_analysis_chunker][{self.filename}] Filtered {skipped_count} images, "
+                f"processing {len(filtered_images)} images for storage and indexing"
+            )
+
+            # Only store images that will be indexed
             storage_results = self.multimodal_blob_client.store_images_batch(
-                described_images,
+                filtered_images,
                 self.url or f"file://{self.filename}",
                 organization_id=organization_id,
             )
 
-            # Create chunks for each image
+            # Create chunks for each filtered image
             for i, (img, storage_result) in enumerate(
-                zip(described_images, storage_results)
+                zip(filtered_images, storage_results)
             ):
                 location_metadata = img.get("locationMetadata", {})
                 description = img.get("description", "Image description not available")
-
-                # Filter out non-important images (logos, icons, decorative elements)
-                # The image description system prompt returns exactly "Not an important image" for these
-                if (
-                    description
-                    and description.strip().lower() == "not an important image."
-                ):
-                    logging.info(
-                        f"[doc_analysis_chunker][{self.filename}] Skipping non-statistical image {img.get('id')} - "
-                        f"likely logo/icon/decorative element"
-                    )
-                    continue
 
                 # Log image processing for traceability
                 logging.debug(

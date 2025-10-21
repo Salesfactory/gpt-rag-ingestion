@@ -2,8 +2,6 @@ import logging
 import time
 import os
 import requests
-from typing import Optional
-import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -131,8 +129,8 @@ def create_skillset(
     headers = {"Content-Type": "application/json", "api-key": admin_key}
 
     # If skillset doesn't exist, create it
-    logging.info(f"Starting skillset creation process...")
-    logging.info(f"Initializing skillset configuration...")
+    logging.info("Starting skillset creation process...")
+    logging.info("Initializing skillset configuration...")
     start_time = time.time()
 
     body = {
@@ -314,11 +312,11 @@ def create_skillset(
 
     except requests.exceptions.ConnectionError:
         logging.error(
-            f"Connection error while creating skillset. Please verify your network connection."
+            "Connection error while creating skillset. Please verify your network connection."
         )
         raise
     except requests.exceptions.Timeout:
-        logging.error(f"Request timed out while creating skillset. Please try again.")
+        logging.error("Request timed out while creating skillset. Please try again.")
         raise
     except Exception as e:
         logging.error(f"Unexpected error while creating skillset: {str(e)}")

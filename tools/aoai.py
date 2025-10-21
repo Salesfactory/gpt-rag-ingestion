@@ -1,5 +1,3 @@
-# AzureOpenAIClient.py
-
 import logging
 import os
 import tiktoken

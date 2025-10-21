@@ -158,12 +158,9 @@ class BaseChunker:
         self,
         chunk_id,
         content,
-        # summary="",
         embedding_text="",
         title="",
         page=0,
-        # related_images=None,
-        # related_files=None
     ):
         """
         Initialize a chunk dictionary with truncated content if necessary.
@@ -199,11 +196,6 @@ class BaseChunker:
 
         # Truncate the content if it exceeds the maximum byte size
         truncated_content = truncate_content(content, MAX_CONTENT_BYTES)
-
-        # Optionally, you can log or handle the truncation event here
-        # For example:
-        # if truncated_content != content:
-        #     self.logger.warning(f"Content truncated from {len(content.encode('utf-8'))} to {MAX_CONTENT_BYTES} bytes.")
 
         # Use summary for embedding if available; otherwise, use truncated content
         embedding_text = embedding_text if embedding_text else truncated_content

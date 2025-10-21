@@ -9,7 +9,7 @@ import logging
 import os
 from importlib import import_module
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import zipfile
 from xml.etree import ElementTree as ET
@@ -319,7 +319,7 @@ class DirectImageExtractor:
                 img_data = img_buffer.getvalue()
 
                 return [{
-                    'image_id': f"single_image",
+                    'image_id': "single_image",
                     'page_number': 1,
                     'image_data': img_data,
                     'format': 'png',

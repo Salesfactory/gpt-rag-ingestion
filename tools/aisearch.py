@@ -91,7 +91,7 @@ class AISearchClient:
         client = await self.get_search_client(index_name)
 
         try:
-            result = await client.delete_documents(key_field, [key_value])
+            await client.delete_documents(key_field, [key_value])
             logging.info(f"[aisearch] Successfully deleted document with {key_field}='{key_value}' from '{index_name}'.")
         except AzureError as e:
             logging.error(f"[aisearch] AzureError while deleting document from '{index_name}': {e}")
@@ -151,7 +151,7 @@ class AISearchClient:
         top: int = 10,
         skip: int = 0,
         order_by: Optional[str] = None,
-        filter_str: Optional[str] = None  # <-- Add this
+        filter_str: Optional[str] = None
     ) -> Dict[str, Any]:
         client = await self.get_search_client(index_name)
         try:
