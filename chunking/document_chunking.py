@@ -1,16 +1,16 @@
 import logging
 import time
-import json
 import jsonschema
 import psutil
 
 from utils import get_file_extension, get_filename
 from .chunker_factory import ChunkerFactory
 
+
 class DocumentChunker:
     """
     DocumentChunker class is responsible for processing and chunking documents into smaller parts.
-    
+
     Chunking Process:
     -----------------
     The DocumentChunker handles the entire process of chunking a document, from initializing the appropriate
@@ -34,7 +34,8 @@ class DocumentChunker:
     - chunks: The list of document chunks created during the process.
     - errors: A list of error messages encountered during the chunking process.
     - warnings: A list of warnings generated during the chunking process.
-    """    
+    """
+
     def __init__(self):
         pass
 
@@ -44,7 +45,9 @@ class DocumentChunker:
         if exception is not None:
             error_message += f" Exception: {str(exception)}"
 
-        logging.error(f"[document_chunking]{f'[{filename}]' if filename else ''} Error: {error_message}, Ingested Document: {f'[{filename}]' if filename else ''}")
+        logging.error(
+            f"[document_chunking]{f'[{filename}]' if filename else ''} Error: {error_message}, Ingested Document: {f'[{filename}]' if filename else ''}"
+        )
 
         return error_message
 
@@ -54,7 +57,7 @@ class DocumentChunker:
         errors = []
         warnings = []
 
-        url = data['documentUrl']
+        url = data["documentUrl"]
         filename = get_filename(url)
         extension = get_file_extension(url)
         try:
@@ -74,14 +77,14 @@ class DocumentChunker:
         Processes and chunks the document provided in the input data, returning the chunks along with any errors or warnings encountered.
 
         Args:
-            data (dict): 
+            data (dict):
                 A dictionary containing the document's metadata and content. Expected keys include:
                 - "documentUrl" (str): URL of the document.
                 - "documentBytes" (str): Base64-encoded bytes of the document.
                 - Additional optional fields as defined in the input schema.
 
         Returns:
-            tuple: 
+            tuple:
                 A tuple containing three lists:
                 - chunks (list[dict]): The list of document chunks created during the process.
                 - errors (list[str]): A list of error messages encountered during chunking.
@@ -95,23 +98,25 @@ class DocumentChunker:
             >>> chunker = DocumentChunker()
             >>> chunks, errors, warnings = chunker.chunk_documents(data)
         """
-        
+
         chunks = []
         errors = []
         warnings = []
-        
+
         try:
             start_time = time.time()
             process = psutil.Process()
             initial_memory = process.memory_info().rss / 1024 / 1024  # Memory in MB
 
-            filename = data['documentUrl'].split('/')[-1]
-            logging.info(f"[document_chunking][{filename}] Starting chunking process. Initial memory usage: {initial_memory:.1f}MB")
+            filename = data["documentUrl"].split("/")[-1]
+            logging.info(
+                f"[document_chunking][{filename}] Starting chunking process. Initial memory usage: {initial_memory:.1f}MB"
+            )
 
             # Log progress before chunking
             logging.info(f"[document_chunking][{filename}] Initializing chunker...")
             chunks, errors, warnings = await self.chunk_document(data)
-            
+
             # Log memory usage after chunking
             current_memory = process.memory_info().rss / 1024 / 1024
             memory_diff = current_memory - initial_memory
@@ -131,12 +136,12 @@ class DocumentChunker:
                 warnings = self._format_messages(warnings)
 
             if errors:
-                errors = self._format_messages(errors)            
-            
+                errors = self._format_messages(errors)
+
             elapsed_time = time.time() - start_time
-            
+
             logging.info(
                 f"[document_chunking][{filename}] Finished chunking in {elapsed_time:.2f} seconds. "
                 f"{len(chunks)} chunks. {len(errors)} errors. {len(warnings)} warnings."
-            )            
+            )
             return chunks, errors, warnings

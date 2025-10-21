@@ -2,13 +2,13 @@
 
 import os
 import time
-import json
 import logging
 import requests
 from urllib.parse import urlparse, unquote
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 from azure.core.exceptions import ClientAuthenticationError, ResourceNotFoundError
+
 
 class DocumentIntelligenceClient:
     """
@@ -29,33 +29,33 @@ class DocumentIntelligenceClient:
         Initializes the DocumentIntelligence client.
         """
         # ai service resource name
-        self.service_name = os.getenv('AZURE_FORMREC_SERVICE', None)
+        self.service_name = os.getenv("AZURE_FORMREC_SERVICE", None)
         if self.service_name is None:
-            logging.error("[docintelligence] The environment variable 'AZURE_FORMREC_SERVICE' is not set.")
-            raise EnvironmentError("The environment variable 'AZURE_FORMREC_SERVICE' is not set.")
+            logging.error(
+                "[docintelligence] The environment variable 'AZURE_FORMREC_SERVICE' is not set."
+            )
+            raise EnvironmentError(
+                "The environment variable 'AZURE_FORMREC_SERVICE' is not set."
+            )
 
         # API configuration
-        self.DOCINT_40_API = '2023-10-31-preview'
-        self.api_version = os.getenv('FORM_REC_API_VERSION', '2024-11-30')
+        self.DOCINT_40_API = "2023-10-31-preview"
+        self.api_version = os.getenv("FORM_REC_API_VERSION", "2024-11-30")
         self.docint_40_api = self.api_version >= self.DOCINT_40_API
 
         # Network isolation
-        network_isolation = os.getenv('NETWORK_ISOLATION', 'false')
-        self.network_isolation = network_isolation.lower() == 'true'
+        network_isolation = os.getenv("NETWORK_ISOLATION", "false")
+        self.network_isolation = network_isolation.lower() == "true"
 
         # Multimodal configuration
-        self.multimodal_enabled = os.getenv('MULTIMODAL_PROCESSING_ENABLED', 'true').lower() == 'true'
-        self.max_chunk_size = int(os.getenv('NUM_TOKENS', '650'))
-        self.chunk_overlap = int(os.getenv('TOKEN_OVERLAP', '125'))
+        self.multimodal_enabled = (
+            os.getenv("MULTIMODAL_PROCESSING_ENABLED", "true").lower() == "true"
+        )
+        self.max_chunk_size = int(os.getenv("NUM_TOKENS", "650"))
+        self.chunk_overlap = int(os.getenv("TOKEN_OVERLAP", "125"))
 
         # Supported extensions
-        self.file_extensions = [
-            "pdf",
-            "bmp",
-            "jpeg",
-            "png",
-            "tiff"
-        ]
+        self.file_extensions = ["pdf", "bmp", "jpeg", "png", "tiff"]
         self.ai_service_type = "formrecognizer"
         self.output_content_format = ""
         self.docint_features = ""
@@ -68,8 +68,19 @@ class DocumentIntelligenceClient:
 
             # Configure for multimodal processing
             if self.multimodal_enabled:
-                self.output_content_format = "text"  # Use text format for chunking
-                self.extraction_options = ["images", "locationMetadata"]
+                # Use 'figures' output to detect charts, graphs, and diagrams
+                # 'figures' detects visual elements (including charts/graphs rendered as vectors)
+                # while 'images' only extracts embedded raster images (logos, icons)
+                self.output_content_format = (
+                    "markdown"  # Markdown format for better structure
+                )
+                self.analyze_output_options = (
+                    "figures"  # Detect charts, graphs, diagrams
+                )
+                # Note: Not using extraction_options=["images"] as that only gets embedded images
+                logging.info(
+                    "[docintelligence] Multimodal enabled: using 'figures' output for chart/graph detection"
+                )
             else:
                 self.output_content_format = "markdown"
                 self.analyze_output_options = "figures"
@@ -78,7 +89,9 @@ class DocumentIntelligenceClient:
             self.credential = DefaultAzureCredential()
             logging.debug("[docintelligence] Initialized DefaultAzureCredential.")
         except Exception as e:
-            logging.error(f"[docintelligence] Failed to initialize DefaultAzureCredential: {e}")
+            logging.error(
+                f"[docintelligence] Failed to initialize DefaultAzureCredential: {e}"
+            )
             raise
 
     def _get_file_extension(self, filepath):
@@ -91,8 +104,8 @@ class DocumentIntelligenceClient:
         Returns:
             str: The file extension.
         """
-        clean_filepath = filepath.split('?')[0]
-        return clean_filepath.split('.')[-1].lower()
+        clean_filepath = filepath.split("?")[0]
+        return clean_filepath.split(".")[-1].lower()
 
     def _get_content_type(self, file_ext):
         """
@@ -105,7 +118,7 @@ class DocumentIntelligenceClient:
             str: The MIME type.
         """
         extensions = {
-            "pdf": "application/pdf", 
+            "pdf": "application/pdf",
             "bmp": "image/bmp",
             "jpeg": "image/jpeg",
             "png": "image/png",
@@ -113,11 +126,13 @@ class DocumentIntelligenceClient:
             "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
             "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "html": "text/html" 
+            "html": "text/html",
         }
         return extensions.get(file_ext, "application/octet-stream")
 
-    def analyze_document_from_bytes(self, file_bytes: bytes, filename: str, model='prebuilt-layout'):
+    def analyze_document_from_bytes(
+        self, file_bytes: bytes, filename: str, model="prebuilt-layout"
+    ):
         """
         Analyzes a document using the specified model, with input as bytes.
 
@@ -149,7 +164,7 @@ class DocumentIntelligenceClient:
         # Set request endpoint
         request_endpoint = f"https://{self.service_name}.cognitiveservices.azure.com/{self.ai_service_type}/documentModels/{model}:analyze?api-version={self.api_version}"
         if self.docint_features:
-            request_endpoint += f"&features={self.docint_features}" 
+            request_endpoint += f"&features={self.docint_features}"
         if self.output_content_format:
             request_endpoint += f"&outputContentFormat={self.output_content_format}"
         if self.analyze_output_options:
@@ -157,13 +172,17 @@ class DocumentIntelligenceClient:
 
         # Set request headers
         try:
-            token = self.credential.get_token("https://cognitiveservices.azure.com/.default")
+            token = self.credential.get_token(
+                "https://cognitiveservices.azure.com/.default"
+            )
             headers = {
                 "Content-Type": content_type,
                 "Authorization": f"Bearer {token.token}",
-                "x-ms-useragent": "gpt-rag/1.0.0"
+                "x-ms-useragent": "gpt-rag/1.0.0",
             }
-            logging.debug(f"[docintelligence][{filename}] Retrieved authentication token.")
+            logging.debug(
+                f"[docintelligence][{filename}] Retrieved authentication token."
+            )
         except ClientAuthenticationError as e:
             error_message = f"Authentication failed: {e}"
             logging.error(f"[docintelligence][{filename}] {error_message}")
@@ -179,7 +198,9 @@ class DocumentIntelligenceClient:
             response = requests.post(request_endpoint, headers=headers, data=file_bytes)
             logging.info(f"[docintelligence][{filename}] Sent analysis request.")
         except Exception as e:
-            error_message = f"Error when sending request to Document Intelligence API: {e}"
+            error_message = (
+                f"Error when sending request to Document Intelligence API: {e}"
+            )
             logging.error(f"[docintelligence][{filename}] {error_message}")
             errors.append(error_message)
             return result, errors
@@ -187,10 +208,10 @@ class DocumentIntelligenceClient:
         if response.status_code != 202:
             error_messages = {
                 404: "Resource not found. Please verify your request URL. The Document Intelligence API version you are using may not be supported in your region.",
-            }    
+            }
             error_message = error_messages.get(
-                response.status_code, 
-                f"Document Intelligence request error, code {response.status_code}: {response.text}"
+                response.status_code,
+                f"Document Intelligence request error, code {response.status_code}: {response.text}",
             )
             logging.error(f"[docintelligence][{filename}] {error_message}")
             errors.append(error_message)
@@ -211,18 +232,23 @@ class DocumentIntelligenceClient:
                 result_response = requests.get(get_url, headers=result_headers)
                 result_json = result_response.json()
 
-                if result_response.status_code != 200 or result_json.get("status") == "failed":
+                if (
+                    result_response.status_code != 200
+                    or result_json.get("status") == "failed"
+                ):
                     error_message = f"Document Intelligence polling error, code {result_response.status_code}: {result_response.text}"
                     logging.error(f"[docintelligence][{filename}] {error_message}")
                     errors.append(error_message)
                     break
 
                 if result_json.get("status") == "succeeded":
-                    result = result_json.get('analyzeResult', {})
+                    result = result_json.get("analyzeResult", {})
                     logging.debug(f"[docintelligence][{filename}] Analysis succeeded.")
                     break
 
-                logging.debug(f"[docintelligence][{filename}] Analysis in progress. Waiting for 2 seconds before retrying.")
+                logging.debug(
+                    f"[docintelligence][{filename}] Analysis in progress. Waiting for 2 seconds before retrying."
+                )
                 time.sleep(2)
             except Exception as e:
                 error_message = f"Error during polling for analysis result: {e}"
@@ -232,8 +258,7 @@ class DocumentIntelligenceClient:
 
         return result, errors
 
-
-    def analyze_document_from_blob_url(self, file_url, model='prebuilt-layout'):
+    def analyze_document_from_blob_url(self, file_url, model="prebuilt-layout"):
         """
         Analyzes a document in a blob container using the specified model.
 
@@ -256,7 +281,7 @@ class DocumentIntelligenceClient:
         # Set request endpoint
         request_endpoint = f"https://{self.service_name}.cognitiveservices.azure.com/{self.ai_service_type}/documentModels/{model}:analyze?api-version={self.api_version}"
         if self.docint_features:
-            request_endpoint += f"&features={self.docint_features}" 
+            request_endpoint += f"&features={self.docint_features}"
         if self.output_content_format:
             request_endpoint += f"&outputContentFormat={self.output_content_format}"
         if self.analyze_output_options:
@@ -264,13 +289,17 @@ class DocumentIntelligenceClient:
 
         # Set request headers
         try:
-            token = self.credential.get_token("https://cognitiveservices.azure.com/.default")
+            token = self.credential.get_token(
+                "https://cognitiveservices.azure.com/.default"
+            )
             headers = {
                 "Content-Type": self._get_content_type(file_ext),
                 "Authorization": f"Bearer {token.token}",
-                "x-ms-useragent": "gpt-rag/1.0.0"
+                "x-ms-useragent": "gpt-rag/1.0.0",
             }
-            logging.debug(f"[docintelligence][{filename}] Retrieved authentication token.")
+            logging.debug(
+                f"[docintelligence][{filename}] Retrieved authentication token."
+            )
         except ClientAuthenticationError as e:
             error_message = f"Authentication failed: {e}"
             logging.error(f"[docintelligence][{filename}] {error_message}")
@@ -285,17 +314,23 @@ class DocumentIntelligenceClient:
         parsed_url = urlparse(file_url)
         account_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
         container_name = parsed_url.path.split("/")[1]
-        blob_name = unquote(parsed_url.path[len(f"/{container_name}/"):])
+        blob_name = unquote(parsed_url.path[len(f"/{container_name}/") :])
 
         logging.debug(f"[docintelligence][{filename}] Connecting to blob storage.")
 
         try:
-            blob_service_client = BlobServiceClient(account_url=account_url, credential=self.credential)
-            blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+            blob_service_client = BlobServiceClient(
+                account_url=account_url, credential=self.credential
+            )
+            blob_client = blob_service_client.get_blob_client(
+                container=container_name, blob=blob_name
+            )
             data = blob_client.download_blob().readall()
             logging.debug(f"[docintelligence][{filename}] Downloaded blob data.")
         except ResourceNotFoundError:
-            error_message = f"Blob '{blob_name}' not found in container '{container_name}'."
+            error_message = (
+                f"Blob '{blob_name}' not found in container '{container_name}'."
+            )
             logging.error(f"[docintelligence][{filename}] {error_message}")
             errors.append(error_message)
             return result, errors
@@ -314,7 +349,9 @@ class DocumentIntelligenceClient:
             response = requests.post(request_endpoint, headers=headers, data=data)
             logging.info(f"[docintelligence][{filename}] Sent analysis request.")
         except Exception as e:
-            error_message = f"Error when sending request to Document Intelligence API: {e}"
+            error_message = (
+                f"Error when sending request to Document Intelligence API: {e}"
+            )
             logging.error(f"[docintelligence][{filename}] {error_message}")
             errors.append(error_message)
             return result, errors
@@ -324,8 +361,8 @@ class DocumentIntelligenceClient:
                 404: "Resource not found. Please verify your request URL. The Document Intelligence API version you are using may not be supported in your region.",
             }
             error_message = error_messages.get(
-                response.status_code, 
-                f"Document Intelligence request error, code {response.status_code}: {response.text}"
+                response.status_code,
+                f"Document Intelligence request error, code {response.status_code}: {response.text}",
             )
             logging.error(f"[docintelligence][{filename}] {error_message}")
             errors.append(error_message)
@@ -346,18 +383,23 @@ class DocumentIntelligenceClient:
                 result_response = requests.get(get_url, headers=result_headers)
                 result_json = result_response.json()
 
-                if result_response.status_code != 200 or result_json.get("status") == "failed":
+                if (
+                    result_response.status_code != 200
+                    or result_json.get("status") == "failed"
+                ):
                     error_message = f"Document Intelligence polling error, code {result_response.status_code}: {result_response.text}"
                     logging.error(f"[docintelligence][{filename}] {error_message}")
                     errors.append(error_message)
                     break
 
                 if result_json.get("status") == "succeeded":
-                    result = result_json.get('analyzeResult', {})
+                    result = result_json.get("analyzeResult", {})
                     logging.debug(f"[docintelligence][{filename}] Analysis succeeded.")
                     break
 
-                logging.debug(f"[docintelligence][{filename}] Analysis in progress. Waiting for 2 seconds before retrying.")
+                logging.debug(
+                    f"[docintelligence][{filename}] Analysis in progress. Waiting for 2 seconds before retrying."
+                )
                 time.sleep(2)
             except Exception as e:
                 error_message = f"Error during polling for analysis result: {e}"

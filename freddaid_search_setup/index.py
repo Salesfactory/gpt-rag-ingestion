@@ -2,8 +2,6 @@ import logging
 import time
 import os
 import requests
-from typing import Optional
-import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -33,8 +31,6 @@ azure_openai_api_key = os.getenv("AZURE_OPENAI_API_KEY")
 ########################################################
 # Create index
 ########################################################
-
-
 
 
 def create_index_body(
@@ -279,8 +275,7 @@ def create_index_body(
                 "key": False,
                 "synonymMaps": [],
             },
-            
-                {
+            {
                 "name": "date_last_modified",
                 "type": "Edm.DateTimeOffset",
                 "searchable": False,
@@ -289,6 +284,54 @@ def create_index_body(
                 "stored": True,
                 "sortable": True,
                 "facetable": True,
+                "key": False,
+                "synonymMaps": [],
+            },
+            {
+                "name": "type",
+                "type": "Edm.String",
+                "searchable": False,
+                "filterable": True,
+                "retrievable": True,
+                "stored": True,
+                "sortable": False,
+                "facetable": True,
+                "key": False,
+                "synonymMaps": [],
+            },
+            {
+                "name": "image_url",
+                "type": "Edm.String",
+                "searchable": False,
+                "filterable": False,
+                "retrievable": True,
+                "stored": True,
+                "sortable": False,
+                "facetable": False,
+                "key": False,
+                "synonymMaps": [],
+            },
+            {
+                "name": "image_id",
+                "type": "Edm.String",
+                "searchable": False,
+                "filterable": True,
+                "retrievable": True,
+                "stored": True,
+                "sortable": False,
+                "facetable": False,
+                "key": False,
+                "synonymMaps": [],
+            },
+            {
+                "name": "location_metadata",
+                "type": "Edm.String",
+                "searchable": False,
+                "filterable": False,
+                "retrievable": True,
+                "stored": True,
+                "sortable": False,
+                "facetable": False,
                 "key": False,
                 "synonymMaps": [],
             },
@@ -331,7 +374,7 @@ def create_index_body(
                         "titleField": {"fieldName": "title"},
                     },
                 }
-            ]
+            ],
         },
         "vectorSearch": {
             "algorithms": [
@@ -360,7 +403,6 @@ def create_index_body(
                     "azureOpenAIParameters": {
                         "resourceUri": f"https://{os.getenv('AZURE_OPENAI_SERVICE_NAME')}.openai.azure.com",
                         "deploymentId": "text-embedding-3-small",
-                        "apiKey": os.getenv("AZURE_OPENAI_API_KEY"),
                         "modelName": "text-embedding-3-small",
                     },
                 }
@@ -388,11 +430,11 @@ def create_index_body(
 
     except requests.exceptions.ConnectionError:
         logging.error(
-            f"Connection error while creating index. Please verify your network connection and try again."
+            "Connection error while creating index. Please verify your network connection and try again."
         )
         raise
     except requests.exceptions.Timeout:
-        logging.error(f"Timeout error while creating index. Please try again.")
+        logging.error("Timeout error while creating index. Please try again.")
         raise
     except Exception as e:
         logging.error(f"Error creating index '{index_name}': {e}")

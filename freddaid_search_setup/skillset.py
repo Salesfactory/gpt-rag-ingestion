@@ -218,7 +218,7 @@ def create_skillset(
                         },
                         {
                             "name": "date_uploaded",
-                            "source": "/document/chunks/*/date_uploaded", # it's different from org_id because it will use default value if not found so it has to be retrieved from the chunking process, not metadata alone
+                            "source": "/document/chunks/*/date_uploaded",  # it's different from org_id because it will use default value if not found so it has to be retrieved from the chunking process, not metadata alone
                             "inputs": [],
                         },
                         {
@@ -256,9 +256,29 @@ def create_skillset(
                             "source": "/document/chunks/*/content/keyPhrases",
                             "inputs": [],
                         },
-                                  {
+                        {
                             "name": "date_last_modified",
                             "source": "/document/metadata_storage_last_modified",
+                            "inputs": [],
+                        },
+                        {
+                            "name": "type",
+                            "source": "/document/chunks/*/type",
+                            "inputs": [],
+                        },
+                        {
+                            "name": "image_url",
+                            "source": "/document/chunks/*/image_url",
+                            "inputs": [],
+                        },
+                        {
+                            "name": "image_id",
+                            "source": "/document/chunks/*/image_id",
+                            "inputs": [],
+                        },
+                        {
+                            "name": "location_metadata",
+                            "source": "/document/chunks/*/location_metadata",
                             "inputs": [],
                         },
                     ],
