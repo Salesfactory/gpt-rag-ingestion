@@ -1,8 +1,6 @@
 import logging
-import time
 import os
 import requests
-from typing import Optional
 import json
 from dotenv import load_dotenv
 

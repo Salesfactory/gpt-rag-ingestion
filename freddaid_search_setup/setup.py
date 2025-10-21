@@ -1,9 +1,5 @@
 import logging
-import time
 import os
-import requests
-from typing import Optional
-import json
 from index import create_index_body
 from datasource import create_datasource
 from skillset import create_skillset

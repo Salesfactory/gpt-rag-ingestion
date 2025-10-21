@@ -2,8 +2,6 @@ import logging
 import time
 import os
 import requests
-from typing import Optional
-import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -116,7 +114,7 @@ def create_datasource(
 
     except requests.exceptions.ConnectionError:
         logging.error(
-            f"Connection error while checking datasource. Please verify your network connection."
+            "Connection error while checking datasource. Please verify your network connection."
         )
         raise
     except Exception as e:
@@ -213,7 +211,7 @@ def create_datasource(
 
     except requests.exceptions.ConnectionError:
         logging.error(
-            f"Connection error while creating datasource. Please verify your network connection."
+            "Connection error while creating datasource. Please verify your network connection."
         )
         raise
     except Exception as e:
