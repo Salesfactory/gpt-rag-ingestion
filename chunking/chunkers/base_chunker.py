@@ -2,10 +2,12 @@ import logging
 import os
 import re
 from urllib.parse import unquote, urlparse
-from datetime import datetime, timezone
 from uuid import uuid4
 from tools import AzureOpenAIClient, GptTokenEstimator
-from utils.file_utils import get_file_extension
+from tools.blob import BlobStorageClient
+from datetime import datetime, timezone
+
+
 
 class BaseChunker:
     """
@@ -98,7 +100,7 @@ class BaseChunker:
                 - "documentSasToken" (str): The SAS token for accessing the document. Can be an empty string
                   if not using storage account or key-based storage access.
                 - "documentContent" (str): The raw content of the document.
-        
+
         Attributes
         ----------
         url : str
@@ -121,30 +123,30 @@ class BaseChunker:
             An instance of the Azure OpenAI client initialized with the filename.
         """
         self.data = data
-        self.url = data['documentUrl']
-        self.sas_token = data.get('documentSasToken', "")
+        self.url = data["documentUrl"]
+        self.sas_token = data.get("documentSasToken", "")
         self.file_url = f"{self.url}{self.sas_token}"
-        self.document_bytes = data.get('documentBytes', None)
-        document_url = data.get('documentUrl', '')
-        
+        self.document_bytes = data.get("documentBytes", None)
+        document_url = data.get("documentUrl", "")
+
         # Parse and decode the URL to get the correct filename
         parsed_url = urlparse(document_url)
         decoded_path = unquote(parsed_url.path)  # Decode URL-encoded characters
         self.filename = os.path.basename(decoded_path)
-        
+
         # Get the file extension (including the dot)
-        self.extension = os.path.splitext(self.filename)[1].lower().lstrip('.')
-        
+        self.extension = os.path.splitext(self.filename)[1].lower().lstrip(".")
+
         # Add debug logging
         logging.debug(f"[base_chunker] Original URL path: {parsed_url.path}")
         logging.debug(f"[base_chunker] Decoded filename: {self.filename}")
         logging.debug(f"[base_chunker] Detected extension: {self.extension}")
-        
-        document_content = data.get('documentContent') 
+
+        document_content = data.get("documentContent")
         self.document_content = document_content if document_content else ""
         self.token_estimator = GptTokenEstimator()
         self.aoai_client = AzureOpenAIClient(document_filename=self.filename)
-        
+
         # Retrieve date_uploaded from blob metadata if available, otherwise use current time
         self.date_uploaded = self._get_date_uploaded_from_metadata()
 
@@ -156,12 +158,9 @@ class BaseChunker:
         self,
         chunk_id,
         content,
-        # summary="",
         embedding_text="",
         title="",
         page=0,
-        # related_images=None,
-        # related_files=None
     ):
         """
         Initialize a chunk dictionary with truncated content if necessary.
@@ -182,34 +181,30 @@ class BaseChunker:
             dict: A dictionary representing the chunk with all the attributes, including the embedding vector.
         """
 
-
         # Define the maximum allowed byte size for the content field
         MAX_CONTENT_BYTES = 32766
 
         # Function to truncate content to fit within the byte limit without breaking UTF-8 characters
         def truncate_content(content_str, max_bytes):
-            encoded_content = content_str.encode('utf-8')
+            encoded_content = content_str.encode("utf-8")
             if len(encoded_content) <= max_bytes:
                 return content_str  # No truncation needed
             # Truncate the byte array to the maximum allowed size
             truncated_bytes = encoded_content[:max_bytes]
             # Decode back to string, ignoring any incomplete characters at the end
-            return truncated_bytes.decode('utf-8', 'ignore')
+            return truncated_bytes.decode("utf-8", "ignore")
 
         # Truncate the content if it exceeds the maximum byte size
         truncated_content = truncate_content(content, MAX_CONTENT_BYTES)
-
-        # Optionally, you can log or handle the truncation event here
-        # For example:
-        # if truncated_content != content:
-        #     self.logger.warning(f"Content truncated from {len(content.encode('utf-8'))} to {MAX_CONTENT_BYTES} bytes.")
 
         # Use summary for embedding if available; otherwise, use truncated content
         embedding_text = embedding_text if embedding_text else truncated_content
         try:
             content_vector = self.aoai_client.get_embeddings(embedding_text)
         except Exception as e:
-            logging.error(f"[base_chunker][{self.filename}] Failed to generate embeddings: {e}")            
+            logging.error(
+                f"[base_chunker][{self.filename}] Failed to generate embeddings: {e}"
+            )
             content_vector = []
 
         return {
@@ -222,88 +217,101 @@ class BaseChunker:
             "filepath": self.filename,
             "content": truncated_content,
             "vector": content_vector,
-            "title": self._extract_title_from_filename(self.filename) if not title else title,
+            "title": (
+                self._extract_title_from_filename(self.filename) if not title else title
+            ),
             "page": page,
         }
 
     def _get_date_uploaded_from_metadata(self):
         """
         Retrieves the date_uploaded from blob metadata, or returns current timestamp if not available.
-        
+
         Returns:
             str: ISO formatted date string
         """
         try:
-            from tools.blob import BlobStorageClient
-            from datetime import datetime, timezone
-            
+
             # Create blob client to get metadata
             blob_client = BlobStorageClient(self.file_url)
             metadata = blob_client.get_metadata()
-            
+
             # Get date_uploaded from metadata
-            date_uploaded = metadata.get('date_uploaded')
-            
+            date_uploaded = metadata.get("date_uploaded")
+
             if date_uploaded:
-                logging.debug(f"[base_chunker][{self.filename}] Using date_uploaded from metadata: {date_uploaded}")
+                logging.debug(
+                    f"[base_chunker][{self.filename}] Using date_uploaded from metadata: {date_uploaded}"
+                )
                 return date_uploaded
             else:
-                logging.debug(f"[base_chunker][{self.filename}] No date_uploaded in metadata, using current time")
+                logging.debug(
+                    f"[base_chunker][{self.filename}] No date_uploaded in metadata, using current time"
+                )
                 # Fallback to current time if not in metadata
-                return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
-                
+                return (
+                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
+                    + "Z"
+                )
+
         except Exception as e:
-            logging.warning(f"[base_chunker][{self.filename}] Error retrieving date_uploaded from metadata: {e}. Using current time.")
-            # Fallback to current time if there's an error
-            from datetime import datetime, timezone
-            return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+            logging.warning(
+                f"[base_chunker][{self.filename}] Error retrieving date_uploaded from metadata: {e}. Using current time."
+            )
+            return (
+                datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+            )
 
     def _extract_title_from_filename(self, filename):
         """
-        Extracts a title from a filename by removing the extension and 
-        replacing underscores or other delimiters with spaces, 
+        Extracts a title from a filename by removing the extension and
+        replacing underscores or other delimiters with spaces,
         then capitalizing words appropriately.
-        
+
         Args:
             filename (str): The name of the file.
-        
+
         Returns:
             str: The extracted title.
         """
         try:
             # Remove the file extension
             title = os.path.splitext(filename)[0]
-    
+
             # Replace common delimiters with spaces
-            title = re.sub(r'[_-]', ' ', title)
-    
+            title = re.sub(r"[_-]", " ", title)
+
             # Add a space before any capital letter that follows a lowercase letter or number
-            title = re.sub(r'(?<=[a-z0-9])(?=[A-Z])', ' ', title)
-    
+            title = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", title)
+
             # Capitalize the first letter of each word
             title = title.title()
-    
+
             return title
         except Exception as e:
-            logging.error(f"[base_chunker][{filename}] Error extracting title from filename '{filename}': {e}")
+            logging.error(
+                f"[base_chunker][{filename}] Error extracting title from filename '{filename}': {e}"
+            )
             return "filename"
-        
+
     def _truncate_chunk(self, text):
         """
         Truncates the chunk to ensure it fits within the maximum chunk size.
-        
-        This method first cleans up the text by removing unnecessary spaces and line breaks. 
-        If the text still exceeds the maximum token limit, it iteratively truncates the text 
+
+        This method first cleans up the text by removing unnecessary spaces and line breaks.
+        If the text still exceeds the maximum token limit, it iteratively truncates the text
         until it fits within the limit.
-        
+
         Args:
             text (str): The text to be truncated.
-        
+
         Returns:
             str: The truncated chunk.
         """
         if self.token_estimator.estimate_tokens(text) > self.max_chunk_size:
-            logging.info(f"[base_chunker][{self.filename}] Token limit exceeded maximum length, truncating...")
+            logging.info(
+                f"[base_chunker][{self.filename}] Token limit exceeded maximum length, truncating..."
+            )
             step_size = 1  # Initial step size
             iteration = 0  # Iteration counter
 
@@ -316,5 +324,3 @@ class BaseChunker:
                     step_size = min(step_size * 2, 100)
 
         return text
-
-                  

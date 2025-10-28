@@ -1,8 +1,6 @@
 import logging
-import time
 import os
 import requests
-from typing import Optional
 import json
 from dotenv import load_dotenv
 
@@ -35,7 +33,7 @@ search_service_name = os.getenv("AZURE_SEARCH_SERVICE_NAME")
 def create_indexer_body(
     indexer_name: str,
     search_index_name: str,
-    search_index_interval: str = "P1D",
+    search_index_interval: str = "PT6H",
     datasource_name: str = None,
 ):
     # Endpoint URL

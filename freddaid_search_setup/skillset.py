@@ -2,8 +2,6 @@ import logging
 import time
 import os
 import requests
-from typing import Optional
-import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -131,8 +129,8 @@ def create_skillset(
     headers = {"Content-Type": "application/json", "api-key": admin_key}
 
     # If skillset doesn't exist, create it
-    logging.info(f"Starting skillset creation process...")
-    logging.info(f"Initializing skillset configuration...")
+    logging.info("Starting skillset creation process...")
+    logging.info("Initializing skillset configuration...")
     start_time = time.time()
 
     body = {
@@ -218,7 +216,7 @@ def create_skillset(
                         },
                         {
                             "name": "date_uploaded",
-                            "source": "/document/chunks/*/date_uploaded", # it's different from org_id because it will use default value if not found so it has to be retrieved from the chunking process, not metadata alone
+                            "source": "/document/chunks/*/date_uploaded",  # it's different from org_id because it will use default value if not found so it has to be retrieved from the chunking process, not metadata alone
                             "inputs": [],
                         },
                         {
@@ -256,9 +254,29 @@ def create_skillset(
                             "source": "/document/chunks/*/content/keyPhrases",
                             "inputs": [],
                         },
-                                  {
+                        {
                             "name": "date_last_modified",
                             "source": "/document/metadata_storage_last_modified",
+                            "inputs": [],
+                        },
+                        {
+                            "name": "type",
+                            "source": "/document/chunks/*/type",
+                            "inputs": [],
+                        },
+                        {
+                            "name": "image_url",
+                            "source": "/document/chunks/*/image_url",
+                            "inputs": [],
+                        },
+                        {
+                            "name": "image_id",
+                            "source": "/document/chunks/*/image_id",
+                            "inputs": [],
+                        },
+                        {
+                            "name": "location_metadata",
+                            "source": "/document/chunks/*/location_metadata",
                             "inputs": [],
                         },
                     ],
@@ -294,11 +312,11 @@ def create_skillset(
 
     except requests.exceptions.ConnectionError:
         logging.error(
-            f"Connection error while creating skillset. Please verify your network connection."
+            "Connection error while creating skillset. Please verify your network connection."
         )
         raise
     except requests.exceptions.Timeout:
-        logging.error(f"Request timed out while creating skillset. Please try again.")
+        logging.error("Request timed out while creating skillset. Please try again.")
         raise
     except Exception as e:
         logging.error(f"Unexpected error while creating skillset: {str(e)}")

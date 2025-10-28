@@ -1,5 +1,3 @@
-# BlobStorageClient.py
-
 from azure.identity import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential
 from azure.storage.blob import BlobServiceClient
 from urllib.parse import urlparse, unquote

@@ -1,9 +1,5 @@
 import logging
-import time
 import os
-import requests
-from typing import Optional
-import json
 from index import create_index_body
 from datasource import create_datasource
 from skillset import create_skillset
@@ -104,12 +100,12 @@ def setup_search_indexing(
 
 
 if __name__ == "__main__":
-    index_name = "ragindex-test"  # name of the search index
-    datasource_name = "ragindex-test-datasource"  # name of the datasource (in Azure Search)
+    index_name = "ragindex-test-multimodal"  # name of the search index
+    datasource_name = "ragindex-test-multimodal-datasource"  # name of the datasource (in Azure Search)
     container_name = (
-        "documents"  # name of the storage container (in Azure Blob Storage)
+        "ragindex-test"  # name of the storage container (in Azure Blob Storage)
     )
-    indexer_name = "ragindex-test-indexer"  # name of the indexer we want to create
+    indexer_name = "ragindex-test-multimodal-indexer"  # name of the indexer we want to create
 
     setup_search_indexing(
         search_service_name=search_service_name,

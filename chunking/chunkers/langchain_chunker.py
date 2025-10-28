@@ -1,9 +1,12 @@
 import logging
 import os
-import re
 from .base_chunker import BaseChunker
 from ..exceptions import UnsupportedFormatError
-from langchain.text_splitter import MarkdownTextSplitter, RecursiveCharacterTextSplitter, PythonCodeTextSplitter
+from langchain.text_splitter import (
+    MarkdownTextSplitter,
+    RecursiveCharacterTextSplitter,
+)
+
 
 class LangChainChunker(BaseChunker):
     """
@@ -24,22 +27,22 @@ class LangChainChunker(BaseChunker):
     Methods:
     --------
     - get_chunks():
-        Splits the document content into chunks based on the specified format and criteria. 
-        The method first checks if the document's format is supported, then processes the content 
-        into chunks, skipping those that don't meet the minimum size requirement. Finally, it logs 
+        Splits the document content into chunks based on the specified format and criteria.
+        The method first checks if the document's format is supported, then processes the content
+        into chunks, skipping those that don't meet the minimum size requirement. Finally, it logs
         the number of chunks created and skipped.
 
     - _chunk_content():
         Splits the document content into chunks according to the format-specific splitting strategy.
-        The method identifies the format of the document and chooses the corresponding LangChain splitter 
-        (e.g., `MarkdownTextSplitter` for Markdown, `PythonCodeTextSplitter` for Python code, and 
+        The method identifies the format of the document and chooses the corresponding LangChain splitter
+        (e.g., `MarkdownTextSplitter` for Markdown, `PythonCodeTextSplitter` for Python code, and
         `RecursiveCharacterTextSplitter` for other formats). It yields each chunk along with its token count.
     """
 
     def __init__(self, data):
         """
         Initializes the TextChunker with the given data and sets up chunking parameters from environment variables.
-        
+
         Args:
             data (str): The document content to be chunked.
         """
@@ -53,40 +56,40 @@ class LangChainChunker(BaseChunker):
             "html": "html",
             "shtml": "html",
             "htm": "html",
-            "py": "python",
-            "json": "json",
-            "csv": "csv",
-            "xml": "xml"
         }
 
     async def get_chunks(self):
         """
         Splits the document content into chunks based on the specified format and criteria.
-        
+
         Returns:
             list: A list of dictionaries, each representing a chunk of the document.
         """
         chunks = []
-    
+
         if self.extension not in self.supported_formats:
-            raise UnsupportedFormatError(f"[langchain_chunker] {self.filename} {self.extension} format is not supported")
-        
+            raise UnsupportedFormatError(
+                f"[langchain_chunker] {self.filename} {self.extension} format is not supported"
+            )
+
         blob_data = self.document_bytes
-        # try different ecnodings in order of likelihood 
-        encodings = ['utf-8', 'latin-1', 'cp1252', 'ascii']
-        text = None 
+        # try different ecnodings in order of likelihood
+        encodings = ["utf-8", "latin-1", "cp1252", "ascii"]
+        text = None
 
-        for encoding in encodings: 
-            try: 
+        for encoding in encodings:
+            try:
                 text = blob_data.decode(encoding)
-                break 
-            except UnicodeDecodeError: 
-                continue 
+                break
+            except UnicodeDecodeError:
+                continue
 
-        if text is None: 
-            # final fallback: use utf-8 with replace error handler 
-            text = blob_data.decode('utf-8', errors='replace')
-            logging.warning(f"[langchain_chunker] {self.filename} could not be decoded using any of the encodings {encodings}, using utf-8 with replace error handler")
+        if text is None:
+            # final fallback: use utf-8 with replace error handler
+            text = blob_data.decode("utf-8", errors="replace")
+            logging.warning(
+                f"[langchain_chunker] {self.filename} could not be decoded using any of the encodings {encodings}, using utf-8 with replace error handler"
+            )
 
         text_chunks = self._chunk_content(text)
         skipped_chunks = 0
@@ -96,18 +99,24 @@ class LangChainChunker(BaseChunker):
                 chunk_id += 1
                 chunk_size = self.token_estimator.estimate_tokens(text_chunk)
                 if chunk_size > self.max_chunk_size:
-                    logging.info(f"[langchain_chunker][{self.filename}] truncating {chunk_size} size chunk to fit within {self.max_chunk_size} tokens")
+                    logging.info(
+                        f"[langchain_chunker][{self.filename}] truncating {chunk_size} size chunk to fit within {self.max_chunk_size} tokens"
+                    )
                     text_chunk = self._truncate_chunk(text_chunk)
                 chunk_dict = self._create_chunk(chunk_id, text_chunk)
                 chunks.append(chunk_dict)
             else:
                 skipped_chunks += 1
-        logging.debug(f"[langchain_chunker][{self.filename}] {len(chunks)} chunk(s) created")    
+        logging.debug(
+            f"[langchain_chunker][{self.filename}] {len(chunks)} chunk(s) created"
+        )
         if skipped_chunks > 0:
-            logging.debug(f"[langchain_chunker][{self.filename}] {skipped_chunks} chunk(s) skipped")
-    
+            logging.debug(
+                f"[langchain_chunker][{self.filename}] {skipped_chunks} chunk(s) skipped"
+            )
+
         return chunks
-    
+
     def _chunk_content(self, text):
         """
         Splits the document content into chunks according to the specified format and token limits.
@@ -125,28 +134,22 @@ class LangChainChunker(BaseChunker):
         4. Truncates chunks that exceed the maximum token size, ensuring they fit within the limit.
         """
         file_format = self.supported_formats[self.extension]
-    
+
         if file_format == "markdown":
             splitter = MarkdownTextSplitter.from_tiktoken_encoder(
-                chunk_size=self.max_chunk_size, 
-                chunk_overlap=self.token_overlap
-            )
-        elif file_format == "python":
-            splitter = PythonCodeTextSplitter.from_tiktoken_encoder(
-                chunk_size=self.max_chunk_size, 
-                chunk_overlap=self.token_overlap
+                chunk_size=self.max_chunk_size, chunk_overlap=self.token_overlap
             )
         else:
             sentence_endings = [".", "!", "?"]
             word_breaks = [" ", "\n", "\t"]
             splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
                 separators=sentence_endings + word_breaks,
-                chunk_size=self.max_chunk_size, 
-                chunk_overlap=self.token_overlap
+                chunk_size=self.max_chunk_size,
+                chunk_overlap=self.token_overlap,
             )
-    
+
         chunked_content_list = splitter.split_text(text)
-    
+
         for chunked_content in chunked_content_list:
             chunk_size = self.token_estimator.estimate_tokens(chunked_content)
             yield chunked_content, chunk_size  # type: ignore

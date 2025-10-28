@@ -1,17 +1,24 @@
+import base64
+import io
+import json
 import logging
 import os
 import re
 
+import pymupdf
+from azure.core.credentials import AzureKeyCredential
 from langchain.text_splitter import MarkdownTextSplitter, RecursiveCharacterTextSplitter
 
 from .base_chunker import BaseChunker
-from ..exceptions import UnsupportedFormatError, DocAnalysisError
-from tools import DocumentIntelligenceClient, ImageDescriptionClient, MultimodalBlobClient
+from ..exceptions import UnsupportedFormatError
+from prepdocslib.pdfparser import DocumentAnalysisParser
+from tools import (
+    DocumentIntelligenceClient,
+    ImageDescriptionClient,
+    MultimodalBlobClient,
+)
 from tools.blob import BlobStorageClient
 from tools.direct_image_extractor import DirectImageExtractor
-
-from azure.core.credentials import AzureKeyCredential
-from prepdocslib.pdfparser import DocumentAnalysisParser
 
 
 class DocAnalysisChunker(BaseChunker):
@@ -30,11 +37,11 @@ class DocAnalysisChunker(BaseChunker):
 
     Chunking Parameters:
     --------------------
-    - max_chunk_size: The maximum size of each chunk in tokens. This value is sourced from the `NUM_TOKENS` 
+    - max_chunk_size: The maximum size of each chunk in tokens. This value is sourced from the `NUM_TOKENS`
     environment variable, with a default of 650 tokens.
-    - token_overlap: The number of overlapping tokens between consecutive chunks, sourced from the `TOKEN_OVERLAP` 
+    - token_overlap: The number of overlapping tokens between consecutive chunks, sourced from the `TOKEN_OVERLAP`
     environment variable, with a default of 100 tokens.
-    - minimum_chunk_size: The minimum size of each chunk in tokens, sourced from the `MIN_CHUNK_SIZE` environment 
+    - minimum_chunk_size: The minimum size of each chunk in tokens, sourced from the `MIN_CHUNK_SIZE` environment
     variable, with a default of 100 tokens.
 
     Document Analysis:
@@ -48,19 +55,24 @@ class DocAnalysisChunker(BaseChunker):
     - The document content is split into chunks using format-specific strategies.
     - HTML tables in the content are replaced with placeholders during the chunking process to simplify splitting.
     - After chunking, the original content, such as HTML tables, is restored in place of the placeholders.
-    - The chunking process also manages page numbering based on the presence of page breaks, ensuring each chunk 
+    - The chunking process also manages page numbering based on the presence of page breaks, ensuring each chunk
     is correctly associated with its corresponding page.
 
     Error Handling:
     ---------------
-    - The class includes comprehensive error handling during document analysis, such as managing unsupported formats 
+    - The class includes comprehensive error handling during document analysis, such as managing unsupported formats
     and handling general exceptions.
     - The chunking process's progress and outcomes, including the number of chunks created or skipped, are logged.
     """
-    def __init__(self, data, max_chunk_size=None, minimum_chunk_size=None, token_overlap=None):
+
+    def __init__(
+        self, data, max_chunk_size=None, minimum_chunk_size=None, token_overlap=None
+    ):
         super().__init__(data)
         self.max_chunk_size = max_chunk_size or int(os.getenv("NUM_TOKENS", "750"))
-        self.minimum_chunk_size = minimum_chunk_size or int(os.getenv("MIN_CHUNK_SIZE", "100"))
+        self.minimum_chunk_size = minimum_chunk_size or int(
+            os.getenv("MIN_CHUNK_SIZE", "100")
+        )
         self.token_overlap = token_overlap or int(os.getenv("TOKEN_OVERLAP", "100"))
         self.docint_client = DocumentIntelligenceClient()
 
@@ -70,7 +82,9 @@ class DocAnalysisChunker(BaseChunker):
             self.image_description_client = ImageDescriptionClient()
             self.multimodal_blob_client = MultimodalBlobClient()
             self.direct_image_extractor = DirectImageExtractor()
-            logging.info(f"[doc_analysis_chunker] Multimodal processing enabled with direct image extraction for {self.filename}")
+            logging.info(
+                f"[doc_analysis_chunker] Multimodal processing enabled with direct image extraction for {self.filename}"
+            )
         else:
             self.image_description_client = None
             self.multimodal_blob_client = None
@@ -85,9 +99,15 @@ class DocAnalysisChunker(BaseChunker):
         self.extension = f".{self.extension.lower().lstrip('.')}"
 
         # Add debug logging for format detection
-        logging.debug(f"[doc_analysis_chunker] File extension detected: {self.extension}")
-        logging.debug(f"[doc_analysis_chunker] Supported formats: {self.supported_formats}")
-        logging.debug(f"[doc_analysis_chunker] Multimodal enabled: {self.multimodal_enabled}")
+        logging.debug(
+            f"[doc_analysis_chunker] File extension detected: {self.extension}"
+        )
+        logging.debug(
+            f"[doc_analysis_chunker] Supported formats: {self.supported_formats}"
+        )
+        logging.debug(
+            f"[doc_analysis_chunker] Multimodal enabled: {self.multimodal_enabled}"
+        )
 
     async def get_chunks(self):
         """
@@ -105,9 +125,13 @@ class DocAnalysisChunker(BaseChunker):
             Exception: If there is an error during document analysis.
         """
         if self.extension not in self.supported_formats:
-            raise UnsupportedFormatError(f"[doc_analysis_chunker] {self.extension} format is not supported")
+            raise UnsupportedFormatError(
+                f"[doc_analysis_chunker] {self.extension} format is not supported"
+            )
 
-        logging.info(f"[doc_analysis_chunker][{self.filename}] Running get_chunks (multimodal: {self.multimodal_enabled}).")
+        logging.info(
+            f"[doc_analysis_chunker][{self.filename}] Running get_chunks (multimodal: {self.multimodal_enabled})."
+        )
 
         if self.multimodal_enabled:
             return await self._get_multimodal_chunks()
@@ -124,21 +148,24 @@ class DocAnalysisChunker(BaseChunker):
             doc_int_parser = DocumentAnalysisParser(
                 endpoint="https://eastus.api.cognitive.microsoft.com/",
                 credential=AzureKeyCredential(os.getenv("COGNITIVE_SERVICES_KEY")),
-                use_content_understanding=False,
-                content_understanding_endpoint=os.getenv("AZ_COMPUTER_VISION_ENDPOINT"),
             )
-            pages = [page async for page in doc_int_parser.parse(bytes=self.document_bytes, name=self.filename)]
+            pages = [
+                page
+                async for page in doc_int_parser.parse(
+                    bytes=self.document_bytes, name=self.filename
+                )
+            ]
         except Exception as e:
-            logging.error(f"[doc_analysis_chunker][{self.filename}] Error parsing document: {str(e)}")
+            logging.error(
+                f"[doc_analysis_chunker][{self.filename}] Error parsing document: {str(e)}"
+            )
             raise
 
         document_content = ""
         for page in pages:
             document_content += page.text
 
-        document = {
-            "content": document_content
-        }
+        document = {"content": document_content}
 
         chunks = self._process_document_chunks(document)
 
@@ -149,65 +176,158 @@ class DocAnalysisChunker(BaseChunker):
         Multimodal chunk processing using Document Intelligence for text + direct image extraction.
         """
         try:
+            # Check if this is a standalone image file
+            standalone_image_extensions = [".png", ".jpeg", ".jpg", ".bmp", ".tiff"]
+            if self.extension in standalone_image_extensions:
+                logging.info(
+                    f"[doc_analysis_chunker][{self.filename}] Processing standalone image file"
+                )
+                return await self._process_standalone_image()
+
             # Get text sections from Document Intelligence (standard analysis)
             document, analysis_errors = self.docint_client.analyze_document_from_bytes(
-                file_bytes=self.document_bytes,
-                filename=self.filename
+                file_bytes=self.document_bytes, filename=self.filename
             )
 
             if analysis_errors:
-                logging.warning(f"[doc_analysis_chunker][{self.filename}] Analysis had errors: {analysis_errors}")
+                logging.warning(
+                    f"[doc_analysis_chunker][{self.filename}] Analysis had errors: {analysis_errors}"
+                )
 
             if not document:
-                logging.error(f"[doc_analysis_chunker][{self.filename}] No document analysis result")
+                logging.error(
+                    f"[doc_analysis_chunker][{self.filename}] No document analysis result"
+                )
                 # Fallback to traditional processing
                 return await self._get_traditional_chunks()
 
             # Extract text content
-            document_content = document.get('content', '')
+            document_content = document.get("content", "")
             if not document_content:
-                logging.warning(f"[doc_analysis_chunker][{self.filename}] No text content found")
+                logging.warning(
+                    f"[doc_analysis_chunker][{self.filename}] No text content found"
+                )
 
             # Debug: Check if PageBreaks exist in content
-            pagebreak_count = document_content.count('<!-- PageBreak -->')
-            logging.debug(f"[doc_analysis_chunker][{self.filename}] Found {pagebreak_count} PageBreak markers in content")
+            pagebreak_count = document_content.count("<!-- PageBreak -->")
+            logging.debug(
+                f"[doc_analysis_chunker][{self.filename}] Found {pagebreak_count} PageBreak markers in content"
+            )
 
             # Number pagebreaks for proper page tracking
             document_content = self._number_pagebreaks(document_content)
 
             # Process text chunks using character-based splitting with page info from document
-            text_chunks = self._process_text_content_character_based(document_content, document)
+            text_chunks = self._process_text_content_character_based(
+                document_content, document
+            )
+            image_chunks = []
+            figures = document.get("figures", [])
 
-            # Extract images directly using PyMuPDF and other libraries
-            extracted_images = self.direct_image_extractor.extract_images_from_bytes(
-                self.document_bytes,
-                self.filename
+            logging.info(
+                f"[doc_analysis_chunker][{self.filename}] Found {len(text_chunks)} text chunks and {len(figures)} figures from Document Intelligence"
             )
 
-            logging.info(f"[doc_analysis_chunker][{self.filename}] Found {len(text_chunks)} text chunks and {len(extracted_images)} extracted images")
-
-            # Process image chunks if images exist
-            image_chunks = []
-            if extracted_images and self.image_description_client:
-                # Convert to normalized format
-                normalized_images = self.direct_image_extractor.convert_to_normalized_format(
-                    extracted_images,
-                    self.url or f"file://{self.filename}"
-                )
-                image_chunks = await self._process_image_sections(normalized_images)
+            if figures and self.image_description_client:
+                if self.extension == ".pdf":
+                    try:
+                        extracted_figures = self._extract_figures_from_pdf(
+                            figures, self.document_bytes
+                        )
+                        if extracted_figures:
+                            image_chunks = await self._process_image_sections(
+                                extracted_figures
+                            )
+                            logging.info(
+                                f"[doc_analysis_chunker][{self.filename}] Successfully processed {len(image_chunks)} figure chunks from PDF"
+                            )
+                        else:
+                            logging.warning(
+                                f"[doc_analysis_chunker][{self.filename}] No figures could be extracted from PDF"
+                            )
+                    except Exception as e:
+                        logging.error(
+                            f"[doc_analysis_chunker][{self.filename}] Error extracting figures: {e}"
+                        )
+                else:
+                    logging.debug(
+                        f"[doc_analysis_chunker][{self.filename}] Figure extraction not available for {self.extension}"
+                    )
 
             # Combine all chunks
             all_chunks = text_chunks + image_chunks
 
-            logging.info(f"[doc_analysis_chunker][{self.filename}] Generated {len(text_chunks)} text chunks and {len(image_chunks)} image chunks")
+            logging.info(
+                f"[doc_analysis_chunker][{self.filename}] Generated {len(text_chunks)} text chunks and {len(image_chunks)} image chunks"
+            )
 
             return all_chunks
 
         except Exception as e:
-            logging.error(f"[doc_analysis_chunker][{self.filename}] Error in multimodal processing: {str(e)}")
+            logging.error(
+                f"[doc_analysis_chunker][{self.filename}] Error in multimodal processing: {str(e)}"
+            )
             # Fallback to traditional processing
-            logging.info(f"[doc_analysis_chunker][{self.filename}] Falling back to traditional processing")
+            logging.info(
+                f"[doc_analysis_chunker][{self.filename}] Falling back to traditional processing"
+            )
             return await self._get_traditional_chunks()
+
+    async def _process_standalone_image(self):
+        """
+        Process a standalone image file as a single image chunk.
+        Converts the image to normalized format and processes through image description pipeline.
+
+        Returns:
+            list: A list containing a single image chunk
+        """
+        try:
+            # Convert image bytes to base64
+            base64_data = base64.b64encode(self.document_bytes).decode("utf-8")
+
+            # Determine content type based on extension
+            content_type_map = {
+                ".png": "image/png",
+                ".jpeg": "image/jpeg",
+                ".jpg": "image/jpeg",
+                ".bmp": "image/bmp",
+                ".tiff": "image/tiff",
+            }
+            content_type = content_type_map.get(self.extension, "image/png")
+
+            # Create normalized image structure
+            normalized_image = {
+                "id": f"{self.filename}_standalone",
+                "data": base64_data,
+                "contentType": content_type,
+                "sourceUrl": self.url or f"file://{self.filename}",
+                "size": len(self.document_bytes),
+                "locationMetadata": {
+                    "pageNumber": 1,
+                    "ordinalPosition": 1,
+                    "isStandaloneImage": True,
+                },
+            }
+
+            logging.info(
+                f"[doc_analysis_chunker][{self.filename}] Created normalized image structure for standalone image"
+            )
+
+            # Process through image description pipeline
+            image_chunks = await self._process_image_sections([normalized_image])
+
+            logging.info(
+                f"[doc_analysis_chunker][{self.filename}] Successfully processed standalone image as {len(image_chunks)} chunk(s)"
+            )
+
+            return image_chunks
+
+        except Exception as e:
+            logging.error(
+                f"[doc_analysis_chunker][{self.filename}] Error processing standalone image: {str(e)}"
+            )
+            # Return empty list on failure
+            return []
 
     def _process_text_content_character_based(self, document_content, document=None):
         """
@@ -231,8 +351,10 @@ class DocAnalysisChunker(BaseChunker):
         overlap = self.token_overlap * chars_per_token
 
         # Check if PageBreaks exist, if not use alternative page estimation
-        has_pagebreaks = '<!-- PageBreak' in document_content
-        logging.debug(f"[doc_analysis_chunker][{self.filename}] PageBreaks available: {has_pagebreaks}")
+        has_pagebreaks = "<!-- PageBreak" in document_content
+        logging.debug(
+            f"[doc_analysis_chunker][{self.filename}] PageBreaks available: {has_pagebreaks}"
+        )
 
         # Split content into character-based chunks with page tracking
         start = 0
@@ -270,13 +392,15 @@ class DocAnalysisChunker(BaseChunker):
                     chunk_id=chunk_id,
                     content=chunk_content.strip(),
                     page=chunk_page,  # Now uses proper page tracking or estimation
-                    chunk_type='text',
+                    chunk_type="text",
                     location_metadata={
-                        'start_char': start,
-                        'end_char': end,
-                        'chunk_method': 'character_based',
-                        'page_estimation_method': 'pagebreak' if has_pagebreaks else 'character_position'
-                    }
+                        "start_char": start,
+                        "end_char": end,
+                        "chunk_method": "character_based",
+                        "page_estimation_method": (
+                            "pagebreak" if has_pagebreaks else "character_position"
+                        ),
+                    },
                 )
                 chunks.append(chunk)
 
@@ -285,9 +409,175 @@ class DocAnalysisChunker(BaseChunker):
                 break
             start = end - overlap
 
-        logging.debug(f"[doc_analysis_chunker][{self.filename}] Created {len(chunks)} character-based text chunks")
+        logging.debug(
+            f"[doc_analysis_chunker][{self.filename}] Created {len(chunks)} character-based text chunks"
+        )
         return chunks
 
+    def _extract_figures_from_pdf(self, figures, pdf_bytes):
+        """
+        Extract figure images from PDF using Document Intelligence bounding boxes.
+        This uses the same approach as pdfparser.py to crop charts/graphs from PDFs.
+
+        Args:
+            figures (list): List of figure objects from Document Intelligence
+            pdf_bytes (bytes): PDF document bytes
+
+        Returns:
+            list: Normalized images in format expected by _process_image_sections
+        """
+        normalized_images = []
+
+        try:
+            # Open PDF from bytes
+            doc = pymupdf.open(stream=io.BytesIO(pdf_bytes), filetype="pdf")
+            logging.debug(
+                f"[doc_analysis_chunker][{self.filename}] Opened PDF with {len(doc)} pages for figure extraction"
+            )
+
+            for fig_idx, figure in enumerate(figures):
+                try:
+                    # Get figure bounding region
+                    if not figure.get("boundingRegions"):
+                        logging.warning(
+                            f"[doc_analysis_chunker][{self.filename}] Figure {fig_idx} has no bounding regions, skipping"
+                        )
+                        continue
+
+                    bounding_region = figure["boundingRegions"][0]
+                    polygon = bounding_region.get("polygon", [])
+
+                    if len(polygon) < 8:
+                        logging.warning(
+                            f"[doc_analysis_chunker][{self.filename}] Figure {fig_idx} polygon has only {len(polygon)} values (expected 8)"
+                        )
+                        continue
+
+                    # Extract bounding box from polygon (coordinates in inches for PDFs)
+                    # Polygon format: [x0, y0, x1, y1, x2, y2, x3, y3]
+                    # Vertices clockwise: top-left, top-right, bottom-right, bottom-left
+                    bounding_box_raw = (
+                        polygon[0],  # x0 (left) - from top-left vertex
+                        polygon[1],  # y0 (top) - from top-left vertex
+                        polygon[4],  # x1 (right) - from bottom-right vertex
+                        polygon[5],  # y1 (bottom) - from bottom-right vertex
+                    )
+                    page_number = (
+                        bounding_region.get("pageNumber", 1) - 1
+                    )  # Convert to 0-indexed
+
+                    # Add padding to capture axis labels, titles, and legends
+                    padding_inches = float(os.getenv("FIGURE_PADDING_INCHES", "1.0"))
+                    bounding_box = (
+                        max(0, bounding_box_raw[0] - padding_inches),  # x0 - left
+                        max(0, bounding_box_raw[1] - padding_inches),  # y0 - top
+                        bounding_box_raw[2] + padding_inches,  # x1 - right
+                        bounding_box_raw[3] + padding_inches,  # y1 - bottom
+                    )
+
+                    # Calculate figure dimensions in inches (after padding)
+                    width_inches = bounding_box[2] - bounding_box[0]
+                    height_inches = bounding_box[3] - bounding_box[1]
+
+                    logging.debug(
+                        f"[doc_analysis_chunker][{self.filename}] Figure {fig_idx}: page {page_number + 1}, "
+                        f"raw_bbox=({bounding_box_raw[0]:.2f}, {bounding_box_raw[1]:.2f}, {bounding_box_raw[2]:.2f}, {bounding_box_raw[3]:.2f}), "
+                        f"padded_bbox=({bounding_box[0]:.2f}, {bounding_box[1]:.2f}, {bounding_box[2]:.2f}, {bounding_box[3]:.2f}), "
+                        f'size={width_inches:.2f}x{height_inches:.2f} inches (padding={padding_inches}")'
+                    )
+
+                    # Filter out small figures (likely logos/icons)
+                    # Default minimum: 1.0 inch in either dimension (configurable)
+                    min_width = float(os.getenv("MIN_FIGURE_WIDTH_INCHES", "1.0"))
+                    min_height = float(os.getenv("MIN_FIGURE_HEIGHT_INCHES", "1.0"))
+
+                    if width_inches < min_width or height_inches < min_height:
+                        logging.info(
+                            f"[doc_analysis_chunker][{self.filename}] Skipping small figure {fig_idx} "
+                            f"({width_inches:.2f}x{height_inches:.2f} inches) - likely logo/icon"
+                        )
+                        continue
+
+                    # Crop image using same logic as pdfparser.py
+                    image_bytes = DocumentAnalysisParser.crop_image_from_pdf_page(
+                        doc, page_number, bounding_box
+                    )
+
+                    # Convert to base64 for image description
+                    base64_data = base64.b64encode(image_bytes).decode("utf-8")
+
+                    # Create normalized image in expected format
+                    normalized_img = {
+                        "id": f"page_{page_number + 1}_fig_{fig_idx + 1}",
+                        "data": base64_data,
+                        "contentType": "image/png",
+                        "sourceUrl": self.url or f"file://{self.filename}",
+                        "size": None,  # Will be populated if needed
+                        "locationMetadata": {
+                            "pageNumber": page_number + 1,
+                            "ordinalPosition": fig_idx + 1,
+                            "boundingPolygons": {
+                                "x": bounding_box[0]
+                                * 72,  # Convert to points for consistency
+                                "y": bounding_box[1] * 72,
+                                "width": (bounding_box[2] - bounding_box[0]) * 72,
+                                "height": (bounding_box[3] - bounding_box[1]) * 72,
+                            },
+                        },
+                    }
+
+                    normalized_images.append(normalized_img)
+                    logging.info(
+                        f"[doc_analysis_chunker][{self.filename}] Successfully extracted figure {fig_idx} from page {page_number + 1}"
+                    )
+
+                except Exception as e:
+                    logging.error(
+                        f"[doc_analysis_chunker][{self.filename}] Error extracting figure {fig_idx}: {e}"
+                    )
+                    continue
+
+            doc.close()
+            logging.info(
+                f"[doc_analysis_chunker][{self.filename}] Extracted {len(normalized_images)} figures from PDF"
+            )
+
+        except Exception as e:
+            logging.error(
+                f"[doc_analysis_chunker][{self.filename}] Error opening PDF for figure extraction: {e}"
+            )
+            return []
+
+        return normalized_images
+
+    def _should_skip_image(self, description: str) -> bool:
+        """
+        Determine if an image should be skipped from indexing.
+
+        Args:
+            description (str): Image description text
+
+        Returns:
+            bool: True if image should be skipped, False otherwise
+        """
+        if not description:
+            return True
+
+        description_lower = description.strip().lower()
+
+        # Skip non-important images (logos, icons, decorative elements)
+        if description_lower == "not an important image.":
+            return True
+
+        # Skip images with failed descriptions
+        if description.startswith("Error generating description:"):
+            return True
+
+        # Skip images where description was not generated
+        if description == "Description not generated":
+            return True
+
+        return False
 
     async def _process_image_sections(self, normalized_images):
         """
@@ -308,7 +598,7 @@ class DocAnalysisChunker(BaseChunker):
         try:
             blob_client = BlobStorageClient(self.file_url)
             metadata = blob_client.get_metadata()
-            organization_id = metadata.get('organization_id', '') if metadata else ''
+            organization_id = metadata.get("organization_id", "") if metadata else ""
             if organization_id:
                 logging.debug(
                     f"[doc_analysis_chunker][{self.filename}] Using organization_id from metadata: {organization_id}"
@@ -320,65 +610,107 @@ class DocAnalysisChunker(BaseChunker):
 
         try:
             # Generate descriptions for all images
-            described_images = self.image_description_client.describe_normalized_images(normalized_images)
+            described_images = self.image_description_client.describe_normalized_images(
+                normalized_images
+            )
 
-            # Store images in blob storage
+            # Filter out images that should not be indexed BEFORE storage
+            # This prevents both indexing and unnecessary blob storage
+            filtered_images = []
+            skipped_count = 0
+            for img in described_images:
+                description = img.get("description", "")
+                if self._should_skip_image(description):
+                    logging.info(
+                        f"[doc_analysis_chunker][{self.filename}] Skipping image {img.get('id')} - "
+                        f"reason: {description[:80]}"
+                    )
+                    skipped_count += 1
+                    continue
+                filtered_images.append(img)
+
+            logging.info(
+                f"[doc_analysis_chunker][{self.filename}] Filtered {skipped_count} images, "
+                f"processing {len(filtered_images)} images for storage and indexing"
+            )
+
+            # Only store images that will be indexed
             storage_results = self.multimodal_blob_client.store_images_batch(
-                described_images,
+                filtered_images,
                 self.url or f"file://{self.filename}",
                 organization_id=organization_id,
             )
 
-            # Create chunks for each image
-            for i, (img, storage_result) in enumerate(zip(described_images, storage_results)):
-                location_metadata = img.get('locationMetadata', {})
-                description = img.get('description', 'Image description not available')
+            # Create chunks for each filtered image
+            for i, (img, storage_result) in enumerate(
+                zip(filtered_images, storage_results)
+            ):
+                location_metadata = img.get("locationMetadata", {})
+                description = img.get("description", "Image description not available")
 
                 # Log image processing for traceability
-                logging.debug(f"[doc_analysis_chunker][{self.filename}] Processing image {i+1}: ID='{img.get('id')}', description_length={len(description) if description else 0}")
+                logging.debug(
+                    f"[doc_analysis_chunker][{self.filename}] Processing image {i+1}: ID='{img.get('id')}', description_length={len(description) if description else 0}"
+                )
 
                 # Handle storage result - image chunks are still valuable even without storage
                 image_url = None
-                if storage_result.get('success'):
-                    image_url = storage_result.get('image_url')
-                elif storage_result.get('skipped'):
+                if storage_result.get("success"):
+                    image_url = storage_result.get("image_url")
+                elif storage_result.get("skipped"):
                     # Log but continue - image descriptions are still useful
-                    logging.info(f"[doc_analysis_chunker][{self.filename}] Image {img.get('id')} storage skipped but description preserved")
+                    logging.info(
+                        f"[doc_analysis_chunker][{self.filename}] Image {img.get('id')} storage skipped but description preserved"
+                    )
                 else:
-                    logging.warning(f"[doc_analysis_chunker][{self.filename}] Image {img.get('id')} storage failed: {storage_result.get('error', 'Unknown error')}")
+                    logging.warning(
+                        f"[doc_analysis_chunker][{self.filename}] Image {img.get('id')} storage failed: {storage_result.get('error', 'Unknown error')}"
+                    )
 
                 # Use the original image ID as chunk_id for consistency across pipeline
-                original_image_id = img.get('id', f"img_{i+1}")
+                original_image_id = img.get("id", f"img_{i+1}")
 
                 # Get page number from multiple possible locations
                 page_number = (
-                    location_metadata.get('pageNumber') or
-                    img.get('pageNumber') or
-                    1
+                    location_metadata.get("pageNumber") or img.get("pageNumber") or 1
                 )
 
                 chunk = self._create_chunk(
                     chunk_id=original_image_id,
                     content=description,
                     page=page_number,
-                    chunk_type='image',
+                    chunk_type="image",
                     location_metadata=location_metadata,
                     image_url=image_url,
-                    image_id=original_image_id
+                    image_id=original_image_id,
                 )
                 if organization_id:
-                    chunk['organization_id'] = organization_id
+                    chunk["organization_id"] = organization_id
                 chunks.append(chunk)
 
-            logging.debug(f"[doc_analysis_chunker][{self.filename}] Created {len(chunks)} image chunks")
+            logging.debug(
+                f"[doc_analysis_chunker][{self.filename}] Created {len(chunks)} image chunks"
+            )
             return chunks
 
         except Exception as e:
-            logging.error(f"[doc_analysis_chunker][{self.filename}] Error processing images: {e}")
+            logging.error(
+                f"[doc_analysis_chunker][{self.filename}] Error processing images: {e}"
+            )
             return []
 
-    def _create_chunk(self, chunk_id, content, embedding_text="", title="", page=0,
-                     chunk_type="text", location_metadata=None, image_url=None, image_id=None):
+    def _create_chunk(
+        self,
+        chunk_id,
+        content,
+        embedding_text="",
+        title="",
+        page=0,
+        chunk_type="text",
+        location_metadata=None,
+        image_url=None,
+        image_id=None,
+    ):
         """
         Enhanced _create_chunk method that supports multimodal chunks.
 
@@ -402,26 +734,30 @@ class DocAnalysisChunker(BaseChunker):
             content=content,
             embedding_text=embedding_text,
             title=title,
-            page=page
+            page=page,
         )
 
         # Add multimodal enhancements
         enhanced_chunk = base_chunk.copy()
-        enhanced_chunk.update({
-            "type": chunk_type,
-            "location_metadata": location_metadata or {}
-        })
+        # Serialize location_metadata to JSON string for Azure AI Search
+        location_metadata_str = (
+            json.dumps(location_metadata) if location_metadata else json.dumps({})
+        )
+        enhanced_chunk.update(
+            {"type": chunk_type, "location_metadata": location_metadata_str}
+        )
 
         # Add image-specific fields for image chunks
         if chunk_type == "image":
-            enhanced_chunk.update({
-                "image_url": image_url,
-                "image_id": image_id,
-                "content_type": "image_description"
-            })
+            enhanced_chunk.update(
+                {
+                    "image_url": image_url,
+                    "image_id": image_id,
+                    "content_type": "image_description",
+                }
+            )
 
         return enhanced_chunk
-
 
     def _process_document_chunks(self, document):
         """
@@ -441,7 +777,7 @@ class DocAnalysisChunker(BaseChunker):
         5. Logs the number of chunks created and skipped.
         """
         chunks = []
-        document_content = document['content']
+        document_content = document["content"]
         document_content = self._number_pagebreaks(document_content)
 
         text_chunks = self._chunk_content(document_content)
@@ -455,23 +791,25 @@ class DocAnalysisChunker(BaseChunker):
             if num_tokens >= self.minimum_chunk_size:
                 chunk_id += 1
                 chunk = self._create_chunk(
-                    chunk_id=chunk_id,
-                    content=text_chunk,
-                    page=chunk_page
+                    chunk_id=chunk_id, content=text_chunk, page=chunk_page
                 )
                 chunks.append(chunk)
             else:
                 skipped_chunks += 1
 
-        logging.debug(f"[doc_analysis_chunker][{self.filename}] {len(chunks)} chunk(s) created")
+        logging.debug(
+            f"[doc_analysis_chunker][{self.filename}] {len(chunks)} chunk(s) created"
+        )
         if skipped_chunks > 0:
-            logging.debug(f"[doc_analysis_chunker][{self.filename}] {skipped_chunks} chunk(s) skipped")
+            logging.debug(
+                f"[doc_analysis_chunker][{self.filename}] {skipped_chunks} chunk(s) skipped"
+            )
         return chunks
 
     def _chunk_content(self, content):
         """
         Splits the document content into chunks based on the specified format and criteria.
-        
+
         Yields:
             tuple: A tuple containing the chunked content and the number of tokens in the chunk.
         """
@@ -484,7 +822,9 @@ class DocAnalysisChunker(BaseChunker):
         for chunked_content in chunks:
             chunk_size = self.token_estimator.estimate_tokens(chunked_content)
             if chunk_size > self.max_chunk_size:
-                logging.info(f"[doc_analysis_chunker][{self.filename}] truncating {chunk_size} size chunk to fit within {self.max_chunk_size} tokens")
+                logging.info(
+                    f"[doc_analysis_chunker][{self.filename}] truncating {chunk_size} size chunk to fit within {self.max_chunk_size} tokens"
+                )
                 chunked_content = self._truncate_chunk(chunked_content)
 
             yield chunked_content, chunk_size
@@ -492,10 +832,10 @@ class DocAnalysisChunker(BaseChunker):
     def _replace_html_tables(self, content):
         """
         Replaces HTML tables in the content with placeholders.
-        
+
         Args:
             content (str): The document content.
-        
+
         Returns:
             tuple: The content with placeholders and a list of the original tables.
         """
@@ -509,12 +849,12 @@ class DocAnalysisChunker(BaseChunker):
     def _restore_original_tables(self, chunks, placeholders, tables):
         """
         Restores original tables in the chunks from placeholders.
-        
+
         Args:
             chunks (list): The list of text chunks.
             placeholders (list): The list of table placeholders.
             tables (list): The list of original tables.
-        
+
         Returns:
             list: The list of chunks with original tables restored.
         """
@@ -525,50 +865,51 @@ class DocAnalysisChunker(BaseChunker):
     def _choose_splitter(self):
         """
         Chooses the appropriate splitter based on document format.
-        
+
         Returns:
             object: The splitter to use for chunking.
         """
         if self.docint_client.output_content_format == "markdown":
             return MarkdownTextSplitter.from_tiktoken_encoder(
-                chunk_size=self.max_chunk_size,
-                chunk_overlap=self.token_overlap
+                chunk_size=self.max_chunk_size, chunk_overlap=self.token_overlap
             )
         else:
             separators = [".", "!", "?"] + [" ", "\n", "\t"]
             return RecursiveCharacterTextSplitter.from_tiktoken_encoder(
                 separators=separators,
                 chunk_size=self.max_chunk_size,
-                chunk_overlap=self.token_overlap
+                chunk_overlap=self.token_overlap,
             )
 
     def _number_pagebreaks(self, content):
         """
         Finds and numbers all PageBreaks in the content.
-        
+
         Args:
             content (str): The document content.
-        
+
         Returns:
             str: Content with numbered PageBreaks.
         """
-        pagebreaks = re.findall(r'<!-- PageBreak -->', content)
+        pagebreaks = re.findall(r"<!-- PageBreak -->", content)
         for i, _ in enumerate(pagebreaks, 1):
-            content = content.replace('<!-- PageBreak -->', f'<!-- PageBreak{str(i).zfill(5)} -->', 1)
+            content = content.replace(
+                "<!-- PageBreak -->", f"<!-- PageBreak{str(i).zfill(5)} -->", 1
+            )
         return content
 
     def _update_page(self, content, current_page):
         """
         Updates the current page number based on the content.
-        
+
         Args:
             content (str): The content chunk being processed.
             current_page (int): The current page number.
-        
+
         Returns:
             int: The updated current page number.
         """
-        matches = re.findall(r'PageBreak(\d{5})', content)
+        matches = re.findall(r"PageBreak(\d{5})", content)
         if matches:
             page_number = int(matches[-1])
             if page_number >= current_page:
@@ -578,15 +919,15 @@ class DocAnalysisChunker(BaseChunker):
     def _determine_chunk_page(self, content, current_page):
         """
         Determines the chunk page number based on the position of the PageBreak element.
-        
+
         Args:
             content (str): The content chunk being processed.
             current_page (int): The current page number.
-        
+
         Returns:
             int: The page number for the chunk.
         """
-        match = re.search(r'PageBreak(\d{5})', content)
+        match = re.search(r"PageBreak(\d{5})", content)
         if match:
             page_number = int(match.group(1))
             position = match.start() / len(content)
@@ -602,29 +943,31 @@ class DocAnalysisChunker(BaseChunker):
     def _truncate_chunk(self, text):
         """
         Truncates and normalizes the text to ensure it fits within the maximum chunk size.
-        
-        This method first cleans up the text by removing unnecessary spaces and line breaks. 
-        If the text still exceeds the maximum token limit, it iteratively truncates the text 
+
+        This method first cleans up the text by removing unnecessary spaces and line breaks.
+        If the text still exceeds the maximum token limit, it iteratively truncates the text
         until it fits within the limit.
 
-        This method overrides the parent class's method because it includes logic to retain 
+        This method overrides the parent class's method because it includes logic to retain
         PageBreaks within the truncated text.
-        
+
         Args:
             text (str): The text to be truncated and normalized.
-        
+
         Returns:
             str: The truncated and normalized text.
         """
         # Clean up text (e.g. line breaks)
-        text = re.sub(r'\s+', ' ', text).strip()
-        text = re.sub(r'[\n\r]+', ' ', text).strip()
+        text = re.sub(r"\s+", " ", text).strip()
+        text = re.sub(r"[\n\r]+", " ", text).strip()
 
-        page_breaks = re.findall(r'PageBreak\d{5}', text)
+        page_breaks = re.findall(r"PageBreak\d{5}", text)
 
         # Truncate if necessary
         if self.token_estimator.estimate_tokens(text) > self.max_chunk_size:
-            logging.info(f"[doc_analysis_chunker][{self.filename}] token limit reached, truncating...")
+            logging.info(
+                f"[doc_analysis_chunker][{self.filename}] token limit reached, truncating..."
+            )
             step_size = 1  # Initial step size
             iteration = 0  # Iteration counter
 
@@ -645,7 +988,10 @@ class DocAnalysisChunker(BaseChunker):
                 needed_size = self.token_estimator.estimate_tokens(page_break_text)
 
                 # Truncate exactly the size needed to accommodate the page break
-                while self.token_estimator.estimate_tokens(text) + needed_size > self.max_chunk_size:
+                while (
+                    self.token_estimator.estimate_tokens(text) + needed_size
+                    > self.max_chunk_size
+                ):
                     text = text[:-1]  # Remove one character at a time
 
                 # Now add the page break
