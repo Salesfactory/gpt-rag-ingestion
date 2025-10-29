@@ -26,7 +26,6 @@ storage_connection_string = os.getenv("STORAGE_CONNECTION_STRING")
 search_api_version = "2024-11-01-preview"
 azure_search_admin_key = os.getenv("AZURE_SEARCH_ADMIN_KEY")
 search_service_name = os.getenv("AZURE_SEARCH_SERVICE_NAME")
-azure_openai_api_key = os.getenv("AZURE_OPENAI_API_KEY")
 
 ########################################################
 # Create index
