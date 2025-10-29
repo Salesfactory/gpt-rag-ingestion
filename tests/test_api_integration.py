@@ -62,13 +62,129 @@ async def test_api_valid_request():
 @pytest.mark.asyncio
 async def test_api_empty_body():
     """Test that the API handles empty request body."""
-    
+
     # Create a mock request with no JSON body
     req = Mock(spec=func.HttpRequest)
     req.get_json.return_value = None
-    
+
     # Call the async function
     response = await document_chunking(req)
-    
+
     # Check the response
     assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_api_missing_content_type_inference():
+    """Test that missing documentContentType is inferred from file extension."""
+
+    # Create a mock request WITHOUT documentContentType
+    req = Mock(spec=func.HttpRequest)
+    req.get_json.return_value = {
+        "values": [{
+            "recordId": "1",
+            "data": {
+                "documentUrl": "https://example.com/test.txt",
+                "documentSasToken": ""
+            }
+        }]
+    }
+
+    # Mock dependencies
+    with patch('function_app.BlobStorageClient') as mock_blob_client, \
+         patch('function_app.DocumentChunker') as mock_chunker:
+
+        # Setup mocks
+        mock_blob_instance = mock_blob_client.return_value
+        mock_blob_instance.download_blob.return_value = b"test content"
+
+        mock_chunker_instance = mock_chunker.return_value
+        mock_chunker_instance.chunk_documents = AsyncMock(return_value=([], [], []))
+
+        # Call the async function
+        response = await document_chunking(req)
+
+        # Check the response is successful
+        assert response.status_code == 200
+
+        # Verify chunk_documents was called with inferred content type
+        call_args = mock_chunker_instance.chunk_documents.call_args[0][0]
+        assert call_args["documentContentType"] == "text/plain"
+
+
+@pytest.mark.asyncio
+async def test_api_octet_stream_override():
+    """Test that application/octet-stream is overridden with inferred type."""
+
+    # Create a mock request with generic content type
+    req = Mock(spec=func.HttpRequest)
+    req.get_json.return_value = {
+        "values": [{
+            "recordId": "1",
+            "data": {
+                "documentUrl": "https://example.com/document.pdf",
+                "documentContentType": "application/octet-stream",
+                "documentSasToken": ""
+            }
+        }]
+    }
+
+    # Mock dependencies
+    with patch('function_app.BlobStorageClient') as mock_blob_client, \
+         patch('function_app.DocumentChunker') as mock_chunker:
+
+        # Setup mocks
+        mock_blob_instance = mock_blob_client.return_value
+        mock_blob_instance.download_blob.return_value = b"test content"
+
+        mock_chunker_instance = mock_chunker.return_value
+        mock_chunker_instance.chunk_documents = AsyncMock(return_value=([], [], []))
+
+        # Call the async function
+        response = await document_chunking(req)
+
+        # Check the response is successful
+        assert response.status_code == 200
+
+        # Verify chunk_documents was called with better inferred type
+        call_args = mock_chunker_instance.chunk_documents.call_args[0][0]
+        assert call_args["documentContentType"] == "application/pdf"
+
+
+@pytest.mark.asyncio
+async def test_api_preserves_valid_content_type():
+    """Test that valid content types are preserved and not overridden."""
+
+    # Create a mock request with proper content type
+    req = Mock(spec=func.HttpRequest)
+    req.get_json.return_value = {
+        "values": [{
+            "recordId": "1",
+            "data": {
+                "documentUrl": "https://example.com/test.pdf",
+                "documentContentType": "application/pdf",
+                "documentSasToken": ""
+            }
+        }]
+    }
+
+    # Mock dependencies
+    with patch('function_app.BlobStorageClient') as mock_blob_client, \
+         patch('function_app.DocumentChunker') as mock_chunker:
+
+        # Setup mocks
+        mock_blob_instance = mock_blob_client.return_value
+        mock_blob_instance.download_blob.return_value = b"test content"
+
+        mock_chunker_instance = mock_chunker.return_value
+        mock_chunker_instance.chunk_documents = AsyncMock(return_value=([], [], []))
+
+        # Call the async function
+        response = await document_chunking(req)
+
+        # Check the response is successful
+        assert response.status_code == 200
+
+        # Verify chunk_documents was called with original content type
+        call_args = mock_chunker_instance.chunk_documents.call_args[0][0]
+        assert call_args["documentContentType"] == "application/pdf"

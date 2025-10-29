@@ -48,7 +48,7 @@ class TestSchema(unittest.TestCase):
     
     def test_missing_required_data_fields(self):
         """Test that missing required data fields fail validation."""
-        # Missing documentUrl
+        # Missing documentUrl (required)
         invalid_data1 = {
             "values": [{
                 "recordId": "1",
@@ -57,12 +57,14 @@ class TestSchema(unittest.TestCase):
                 }
             }]
         }
-        
+
         with self.assertRaises(jsonschema.exceptions.ValidationError):
             jsonschema.validate(invalid_data1, schema=self.schema)
-        
-        # Missing documentContentType
-        invalid_data2 = {
+
+    def test_missing_optional_content_type(self):
+        """Test that missing documentContentType is now allowed (will be inferred)."""
+        # documentContentType is now optional - function will infer from extension
+        valid_data = {
             "values": [{
                 "recordId": "1",
                 "data": {
@@ -70,9 +72,9 @@ class TestSchema(unittest.TestCase):
                 }
             }]
         }
-        
-        with self.assertRaises(jsonschema.exceptions.ValidationError):
-            jsonschema.validate(invalid_data2, schema=self.schema)
+
+        # Should NOT raise an exception (documentContentType is optional)
+        jsonschema.validate(valid_data, schema=self.schema)
     
     def test_missing_record_id(self):
         """Test that missing recordId fails validation."""
@@ -104,7 +106,8 @@ class TestSchema(unittest.TestCase):
             jsonschema.validate(invalid_data, schema=self.schema)
     
     def test_empty_document_content_type(self):
-        """Test that empty documentContentType fails validation."""
+        """Test that empty documentContentType fails validation (minLength: 1)."""
+        # Empty string should still fail because of minLength: 1
         invalid_data = {
             "values": [{
                 "recordId": "1",
@@ -114,7 +117,7 @@ class TestSchema(unittest.TestCase):
                 }
             }]
         }
-        
+
         with self.assertRaises(jsonschema.exceptions.ValidationError):
             jsonschema.validate(invalid_data, schema=self.schema)
     
