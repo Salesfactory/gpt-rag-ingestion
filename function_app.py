@@ -42,6 +42,62 @@ for logger_name in suppress_loggers:
     logger.propagate = False
 
 # -------------------------------
+# Helper Functions
+# -------------------------------
+
+
+def infer_content_type_from_url(url: str) -> str:
+    """
+    Infer content type from file extension when blob metadata doesn't include it.
+
+    Args:
+        url: Document URL with file extension
+
+    Returns:
+        MIME type string
+    """
+    ext = url.lower().split('.')[-1] if '.' in url else ''
+
+    content_type_map = {
+        # Text formats
+        'txt': 'text/plain',
+        'html': 'text/html',
+        'htm': 'text/html',
+        'json': 'application/json',
+        'xml': 'application/xml',
+        'csv': 'text/csv',
+        'md': 'text/markdown',
+        'py': 'text/x-python',
+        # Document formats
+        'pdf': 'application/pdf',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'doc': 'application/msword',
+        'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'ppt': 'application/vnd.ms-powerpoint',
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'xls': 'application/vnd.ms-excel',
+        # Image formats
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'gif': 'image/gif',
+        'bmp': 'image/bmp',
+        'tiff': 'image/tiff',
+        'tif': 'image/tiff',
+    }
+
+    inferred_type = content_type_map.get(ext, 'application/octet-stream')
+
+    if inferred_type == 'application/octet-stream' and ext:
+        logging.warning(
+            f"[infer_content_type] Unknown file extension '.{ext}' for URL: {url}. "
+            f"Using default: application/octet-stream"
+        )
+
+    return inferred_type
+
+
+# -------------------------------
 # Azure Functions
 # -------------------------------
 
@@ -79,6 +135,28 @@ async def document_chunking(req: func.HttpRequest) -> func.HttpResponse:
             for _, item in enumerate(body["values"]):
                 input_data = item["data"]
                 filename = get_filename(input_data["documentUrl"])
+
+                # Handle missing or generic documentContentType by inferring from file extension
+                content_type = input_data.get("documentContentType", "")
+
+                if not content_type:
+                    # Content type is missing entirely
+                    inferred_type = infer_content_type_from_url(input_data["documentUrl"])
+                    input_data["documentContentType"] = inferred_type
+                    logging.warning(
+                        f'[document_chunking_function] documentContentType missing for {filename}. '
+                        f'Inferred from file extension: {inferred_type}'
+                    )
+                elif content_type == "application/octet-stream":
+                    # Content type is generic/unknown - try to infer better type from extension
+                    inferred_type = infer_content_type_from_url(input_data["documentUrl"])
+                    if inferred_type != "application/octet-stream":
+                        input_data["documentContentType"] = inferred_type
+                        logging.warning(
+                            f'[document_chunking_function] documentContentType was generic (application/octet-stream) for {filename}. '
+                            f'Inferred more specific type from file extension: {inferred_type}'
+                        )
+
                 logging.info(
                     f'[document_chunking_function] Chunking document: File {filename}, Content Type {input_data["documentContentType"]}.'
                 )
@@ -209,7 +287,7 @@ def get_request_schema():
                                 },
                                 "includeVectors": {"type": "boolean"},
                             },
-                            "required": ["documentUrl", "documentContentType"],
+                            "required": ["documentUrl"],
                         },
                     },
                     "required": ["recordId", "data"],
