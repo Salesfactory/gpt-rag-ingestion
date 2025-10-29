@@ -28,8 +28,7 @@ storage_connection_string = os.getenv("STORAGE_CONNECTION_STRING")
 search_api_version = "2024-11-01-preview"
 azure_search_admin_key = os.getenv("AZURE_SEARCH_ADMIN_KEY")
 search_service_name = os.getenv("AZURE_SEARCH_SERVICE_NAME")
-azure_openai_api_key = os.getenv("AZURE_OPENAI_API_KEY")
-function_endpoint = "https://fninges0-vm2b2htvuuclm.azurewebsites.net"
+function_endpoint = os.getenv("INGESTION_FUNCTION_ENDPOINT", "")
 
 
 ########################################################
@@ -100,12 +99,12 @@ def setup_search_indexing(
 
 
 if __name__ == "__main__":
-    index_name = "ragindex-test-multimodal"  # name of the search index
-    datasource_name = "ragindex-test-multimodal-datasource"  # name of the datasource (in Azure Search)
+    index_name = "ragindex-multimodal"  # name of the search index
+    datasource_name = "ragindex-multimodal-datasource"  # name of the datasource (in Azure Search)
     container_name = (
-        "ragindex-test"  # name of the storage container (in Azure Blob Storage)
+        "documents"  # name of the storage container (in Azure Blob Storage)
     )
-    indexer_name = "ragindex-test-multimodal-indexer"  # name of the indexer we want to create
+    indexer_name = "ragindex-multimodal-indexer"  # name of the indexer we want to create
 
     setup_search_indexing(
         search_service_name=search_service_name,
