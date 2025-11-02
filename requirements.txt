@@ -9,6 +9,7 @@ azure-mgmt-web
 azure-mgmt-storage
 azure-search-documents==11.5.2
 azure-storage-blob
+azure-data-tables>=12.4.0
 msgraph-sdk==1.5.4
 
 # Data handling and validation dependencies

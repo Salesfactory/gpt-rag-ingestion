@@ -11,6 +11,7 @@ import azure.functions as func
 
 from chunking import DocumentChunker
 from tools import BlobStorageClient
+from tools.usage_tracker import UsageTracker
 from utils.file_utils import get_filename
 
 # -------------------------------
@@ -169,6 +170,27 @@ async def document_chunking(req: func.HttpRequest) -> func.HttpResponse:
             input_data["documentBytes"] = document_bytes
             input_data["fileName"] = filename
 
+            # Extract organization_id and user_id from blob metadata for cost tracking
+            try:
+                metadata = blob_client.get_metadata()
+                organization_id = metadata.get("organization_id", "unknown") if metadata else "unknown"
+                user_id = metadata.get("user_id", None) if metadata else None
+            except Exception as e:
+                logging.warning(f"[document_chunking_function] Could not retrieve metadata for cost tracking: {e}")
+                organization_id = "unknown"
+                user_id = None
+
+            # Initialize usage tracker
+            usage_tracker = UsageTracker(
+                organization_id=organization_id,
+                user_id=user_id,
+                document_url=input_data["documentUrl"],
+                document_name=filename
+            )
+
+            # Add usage tracker to input data so chunker can use it
+            input_data["usage_tracker"] = usage_tracker
+
             # Chunk the document
             chunks, errors, warnings = await DocumentChunker().chunk_documents(
                 input_data
@@ -206,6 +228,18 @@ async def document_chunking(req: func.HttpRequest) -> func.HttpResponse:
             logging.info(
                 f"[document_chunking][{filename}] Generated {len(chunks)} total chunks: {text_chunks} text, {image_chunks} image"
             )
+
+            # Log usage summary with cost estimation
+            usage_summary = usage_tracker.log_summary()
+
+            # Add cost summary to response warnings for visibility
+            cost_summary_message = (
+                f"Cost Estimate: ${usage_summary['total_estimated_cost_usd']:.6f} USD | "
+                f"Org: {organization_id} | "
+                f"Chunks: {text_chunks} text + {image_chunks} image"
+            )
+            warnings.append(cost_summary_message)
+            logging.info(f"[document_chunking_function] {cost_summary_message}")
 
             # Filter vectors from response if requested
             include_vectors = input_data.get("includeVectors", True)
