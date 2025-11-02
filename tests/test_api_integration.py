@@ -44,11 +44,12 @@ async def test_api_valid_request():
     # Mock dependencies
     with patch('function_app.BlobStorageClient') as mock_blob_client, \
          patch('function_app.DocumentChunker') as mock_chunker:
-        
+
         # Setup mocks
         mock_blob_instance = mock_blob_client.return_value
         mock_blob_instance.download_blob.return_value = b"test content"
-        
+        mock_blob_instance.get_metadata.return_value = {"organization_id": "test_org", "user_id": "test_user"}
+
         mock_chunker_instance = mock_chunker.return_value
         mock_chunker_instance.chunk_documents = AsyncMock(return_value=([], [], []))
         
@@ -97,6 +98,7 @@ async def test_api_missing_content_type_inference():
         # Setup mocks
         mock_blob_instance = mock_blob_client.return_value
         mock_blob_instance.download_blob.return_value = b"test content"
+        mock_blob_instance.get_metadata.return_value = {"organization_id": "test_org", "user_id": "test_user"}
 
         mock_chunker_instance = mock_chunker.return_value
         mock_chunker_instance.chunk_documents = AsyncMock(return_value=([], [], []))
@@ -136,6 +138,7 @@ async def test_api_octet_stream_override():
         # Setup mocks
         mock_blob_instance = mock_blob_client.return_value
         mock_blob_instance.download_blob.return_value = b"test content"
+        mock_blob_instance.get_metadata.return_value = {"organization_id": "test_org", "user_id": "test_user"}
 
         mock_chunker_instance = mock_chunker.return_value
         mock_chunker_instance.chunk_documents = AsyncMock(return_value=([], [], []))
@@ -175,6 +178,7 @@ async def test_api_preserves_valid_content_type():
         # Setup mocks
         mock_blob_instance = mock_blob_client.return_value
         mock_blob_instance.download_blob.return_value = b"test content"
+        mock_blob_instance.get_metadata.return_value = {"organization_id": "test_org", "user_id": "test_user"}
 
         mock_chunker_instance = mock_chunker.return_value
         mock_chunker_instance.chunk_documents = AsyncMock(return_value=([], [], []))
