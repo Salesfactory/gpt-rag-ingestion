@@ -36,10 +36,8 @@ class DocumentIntelligenceClient:
                 "The environment variable 'AZURE_FORMREC_SERVICE' is not set."
             )
 
-        # API configuration
-        self.DOCINT_40_API = "2023-10-31-preview"
         self.api_version = os.getenv("FORM_REC_API_VERSION", "2024-11-30")
-        self.docint_40_api = self.api_version >= self.DOCINT_40_API
+        self.ai_service_type = "documentintelligence"
 
         # Network isolation
         network_isolation = os.getenv("NETWORK_ISOLATION", "false")
@@ -53,35 +51,25 @@ class DocumentIntelligenceClient:
         self.chunk_overlap = int(os.getenv("TOKEN_OVERLAP", "125"))
 
         # Supported extensions
-        self.file_extensions = ["pdf", "bmp", "jpeg", "png", "tiff"]
-        self.ai_service_type = "formrecognizer"
-        self.output_content_format = ""
+        self.file_extensions = [
+            "pdf",
+            "bmp",
+            "jpeg",
+            "png",
+            "tiff",
+            "docx",
+            "pptx",
+            "html",
+        ]
+        self.output_content_format = "text"  # Plain text format without HTML tags
+        self.analyze_output_options = "figures"  # Detect charts, graphs, diagrams
         self.docint_features = ""
-        self.analyze_output_options = ""
         self.extraction_options = []
 
-        if self.docint_40_api:
-            self.ai_service_type = "documentintelligence"
-            self.file_extensions.extend(["docx", "pptx", "xlsx", "html"])
-
-            # Configure for multimodal processing
-            if self.multimodal_enabled:
-                # Use 'figures' output to detect charts, graphs, and diagrams
-                # 'figures' detects visual elements (including charts/graphs rendered as vectors)
-                # while 'images' only extracts embedded raster images (logos, icons)
-                self.output_content_format = (
-                    "text"  # Plain text format without HTML tags
-                )
-                self.analyze_output_options = (
-                    "figures"  # Detect charts, graphs, diagrams
-                )
-                # Note: Not using extraction_options=["images"] as that only gets embedded images
-                logging.info(
-                    "[docintelligence] Multimodal enabled: using 'figures' output for chart/graph detection with text format"
-                )
-            else:
-                self.output_content_format = "text"
-                self.analyze_output_options = "figures"
+        if self.multimodal_enabled:
+            logging.info(
+                "[docintelligence] Multimodal enabled: using 'figures' output for chart/graph detection with text format"
+            )
 
         try:
             self.credential = DefaultAzureCredential()
