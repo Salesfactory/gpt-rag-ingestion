@@ -105,6 +105,21 @@ app = func.FunctionApp()
 
 
 # -------------------------------
+# Event Grid Trigger Function (pulse json file)
+# -------------------------------
+
+
+@app.event_grid_trigger(arg_name="event")
+def EventGridTrigger(event: func.EventGridEvent):
+    """
+    Triggered when .json files are created/deleted in survey-json-intermediate container
+    """
+    logging.info(f'[EventGridTrigger] Event received: {event.event_type}')
+    logging.info(f'[EventGridTrigger] Subject: {event.subject}')
+    logging.info(f'[EventGridTrigger] Event data: {event.get_json()}')
+
+
+# -------------------------------
 # Document Chunking Function (HTTP Triggered by AI Search)
 # -------------------------------
 
