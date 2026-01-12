@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "functionTimeout": "01:00:00",
+  "functionTimeout": "01:30:00",
   "logging": {
     "applicationInsights": {
       "samplingSettings": {
@@ -13,8 +13,15 @@
     "id": "Microsoft.Azure.Functions.ExtensionBundle",
     "version": "[4.*, 5.0.0)"
   },
+  "extensions": {
+    "queues": {
+      "batchSize": 1,
+      "maxDequeueCount": 5,
+      "visibilityTimeout": "00:05:00"
+    }
+  },
   "concurrency": {
-    "dynamicConcurrencyEnabled": true,
+    "dynamicConcurrencyEnabled": false,
     "snapshotPersistenceEnabled": true
   }
 }
