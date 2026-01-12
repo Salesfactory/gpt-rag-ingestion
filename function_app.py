@@ -169,6 +169,11 @@ async def process_survey_queue(msg: func.QueueMessage):
         json_str = json_bytes.decode("utf-8")
         grouped_records = json.loads(json_str)
 
+        # Get source metadata
+        source_metadata = blob_client.get_metadata()
+        source_file_directory = source_metadata.get("source_file_directory", "")
+        source_file_name = source_metadata.get("source_file_name", "")
+
         logging.info(
             f"[process_survey_queue][{filename}] Loaded {len(grouped_records)} records"
         )
@@ -187,14 +192,24 @@ async def process_survey_queue(msg: func.QueueMessage):
         output_filename = f"{base_name}.md"
         output_url = f"https://{storage_account}.blob.core.windows.net/{output_container}/{output_filename}"
 
+        elapsed_time = time.time() - start_time
+
+        # prep metadata for output blob
+        output_metadata = {
+            "source_file_directory": source_file_directory,
+            "source_file_name": source_file_name,
+            "duration_seconds": str(round(elapsed_time, 2)),
+            "processed_at": datetime.datetime.fromtimestamp(start_time).isoformat()
+        }
+
         output_blob_client = BlobStorageClient(output_url)
         output_blob_client.upload_blob(
             data=markdown_content.encode("utf-8"),
             overwrite=True,
             content_type="text/markdown",
+            metadata=output_metadata
         )
 
-        elapsed_time = time.time() - start_time
         logging.info(
             f"[process_survey_queue][{filename}] Completed successfully in {elapsed_time:.2f} seconds. "
             f"Output: {output_filename}"
@@ -254,6 +269,11 @@ async def process_survey_http(req: func.HttpRequest) -> func.HttpResponse:
         json_str = json_bytes.decode("utf-8")
         grouped_records = json.loads(json_str)
 
+        # Get source metadata
+        source_metadata = input_blob_client.get_metadata()
+        source_file_directory = source_metadata.get("source_file_directory", "")
+        source_file_name = source_metadata.get("source_file_name", "")
+
         logging.info(
             f"[process_survey_http][{blob_name}] Loaded {len(grouped_records)} records"
         )
@@ -270,14 +290,24 @@ async def process_survey_http(req: func.HttpRequest) -> func.HttpResponse:
 
         output_filename = f"{base_name}.md"
         output_url = f"https://{storage_account}.blob.core.windows.net/survey-markdown/{output_filename}"
+
+        elapsed_time = time.time() - start_time
+
+        # prep metadata for output blob
+        output_metadata = {
+            "source_file_directory": source_file_directory,
+            "source_file_name": source_file_name,
+            "duration_seconds": str(round(elapsed_time, 2)),
+            "processed_at": datetime.datetime.fromtimestamp(start_time).isoformat()
+        }
+
         output_blob_client = BlobStorageClient(output_url)
         output_blob_client.upload_blob(
             data=markdown_content.encode("utf-8"),
             overwrite=True,
             content_type="text/markdown",
+            metadata=output_metadata
         )
-
-        elapsed_time = time.time() - start_time
 
         response = {
             "status": "success",
