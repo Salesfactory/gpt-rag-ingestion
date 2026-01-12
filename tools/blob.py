@@ -1,5 +1,5 @@
 from azure.identity import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential
-from azure.storage.blob import BlobServiceClient
+from azure.storage.blob import BlobServiceClient, ContentSettings
 from urllib.parse import urlparse, unquote
 import logging
 import time
@@ -103,3 +103,54 @@ class BlobStorageClient:
         # Retrieve existing metadata, if desired
         blob_metadata = blob_client.get_blob_properties().metadata
         return blob_metadata
+
+    def upload_blob(self, data, overwrite=False, content_type=None, metadata=None):
+        """
+        Uploads data to the blob in Azure Blob Storage.
+
+        Args:
+            data (bytes): The data to upload
+            overwrite (bool): Whether to overwrite existing blob (default: False)
+            content_type (str): MIME type of the content (e.g., 'text/markdown')
+            metadata (dict): Optional metadata key-value pairs to attach to the blob
+
+        Raises:
+            Exception: If uploading the blob fails after retries.
+        """
+        blob_client = self.blob_service_client.get_blob_client(container=self.container_name, blob=self.blob_name)
+        blob_error = None
+
+        content_settings = None
+        if content_type:
+            content_settings = ContentSettings(content_type=content_type)
+
+        try:
+            logging.debug(f"[blob][{self.blob_name}] Attempting to upload blob.")
+            blob_client.upload_blob(
+                data,
+                overwrite=overwrite,
+                content_settings=content_settings,
+                metadata=metadata
+            )
+            logging.info(f"[blob][{self.blob_name}] Blob uploaded successfully.")
+        except Exception as e:
+            logging.warning(f"[blob][{self.blob_name}] Upload error, retrying in 10 seconds... Error: {e}")
+            time.sleep(10)
+            try:
+                blob_client.upload_blob(
+                    data,
+                    overwrite=overwrite,
+                    content_settings=content_settings,
+                    metadata=metadata
+                )
+                logging.info(f"[blob][{self.blob_name}] Blob uploaded successfully on retry.")
+            except Exception as e_retry:
+                blob_error = e_retry
+                logging.error(f"[blob][{self.blob_name}] Failed to upload blob after retry: {blob_error}")
+
+        if blob_error:
+            error_message = f"Blob client error when uploading to blob storage: {blob_error}"
+            logging.error(f"[blob][{self.blob_name}] {error_message}")
+            if "AuthorizationPermissionMismatch" in str(blob_error):
+                logging.error("[blob] Authorization error: Please check your permissions.")
+            raise Exception(error_message)
