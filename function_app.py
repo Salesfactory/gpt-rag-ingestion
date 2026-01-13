@@ -49,6 +49,23 @@ app = func.FunctionApp()
 
 
 # -------------------------------
+# Health Check Endpoint
+# -------------------------------
+
+
+@app.route(route="health", auth_level=func.AuthLevel.ANONYMOUS)
+async def health_check(_req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Health check endpoint for Azure App Service health monitoring.
+    Pinged by Azure's health check feature at 1-minute intervals.
+
+    Returns:
+        200 OK when the application is healthy
+    """
+    return func.HttpResponse("OK", status_code=200)
+
+
+# -------------------------------
 # Event Grid Trigger Function (for json-intermediate)
 # -------------------------------
 
