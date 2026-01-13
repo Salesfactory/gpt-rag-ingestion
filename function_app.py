@@ -12,6 +12,7 @@ import azure.functions as func
 from chunking import DocumentChunker
 from tools import BlobStorageClient
 from utils.file_utils import get_filename
+from survey import process_json_to_markdown_in_memory
 
 # -------------------------------
 # Logging configuration
@@ -56,39 +57,39 @@ def infer_content_type_from_url(url: str) -> str:
     Returns:
         MIME type string
     """
-    ext = url.lower().split('.')[-1] if '.' in url else ''
+    ext = url.lower().split(".")[-1] if "." in url else ""
 
     content_type_map = {
         # Text formats
-        'txt': 'text/plain',
-        'html': 'text/html',
-        'htm': 'text/html',
-        'json': 'application/json',
-        'xml': 'application/xml',
-        'csv': 'text/csv',
-        'md': 'text/markdown',
-        'py': 'text/x-python',
+        "txt": "text/plain",
+        "html": "text/html",
+        "htm": "text/html",
+        "json": "application/json",
+        "xml": "application/xml",
+        "csv": "text/csv",
+        "md": "text/markdown",
+        "py": "text/x-python",
         # Document formats
-        'pdf': 'application/pdf',
-        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'doc': 'application/msword',
-        'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        'ppt': 'application/vnd.ms-powerpoint',
-        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'xls': 'application/vnd.ms-excel',
+        "pdf": "application/pdf",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "doc": "application/msword",
+        "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "ppt": "application/vnd.ms-powerpoint",
+        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "xls": "application/vnd.ms-excel",
         # Image formats
-        'png': 'image/png',
-        'jpg': 'image/jpeg',
-        'jpeg': 'image/jpeg',
-        'gif': 'image/gif',
-        'bmp': 'image/bmp',
-        'tiff': 'image/tiff',
-        'tif': 'image/tiff',
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "gif": "image/gif",
+        "bmp": "image/bmp",
+        "tiff": "image/tiff",
+        "tif": "image/tiff",
     }
 
-    inferred_type = content_type_map.get(ext, 'application/octet-stream')
+    inferred_type = content_type_map.get(ext, "application/octet-stream")
 
-    if inferred_type == 'application/octet-stream' and ext:
+    if inferred_type == "application/octet-stream" and ext:
         logging.warning(
             f"[infer_content_type] Unknown file extension '.{ext}' for URL: {url}. "
             f"Using default: application/octet-stream"
@@ -102,6 +103,258 @@ def infer_content_type_from_url(url: str) -> str:
 # -------------------------------
 
 app = func.FunctionApp()
+
+
+# -------------------------------
+# Event Grid Trigger Function
+# -------------------------------
+
+
+@app.event_grid_trigger(arg_name="event")
+@app.queue_output(
+    arg_name="msg", queue_name="survey-processing", connection="AzureWebJobsStorage"
+)
+def EventGridTrigger(event: func.EventGridEvent, msg: func.Out[str]):
+    """
+    Handles blob creation events for survey JSON files.
+    Queues JSON files from survey-json-intermediate container for long-running processing.
+    """
+    event_type = event.event_type
+    blob_url = event.subject
+
+    logging.info(f"[Ingestion-EventGrid] Event: {event_type}, Subject: {blob_url}")
+
+    if event_type == "Microsoft.Storage.BlobCreated":
+        message_data = {
+            "blobUrl": blob_url,
+            "eventType": event_type,
+            "eventTime": event.event_time.isoformat() if event.event_time else None,
+        }
+        msg.set(json.dumps(message_data))
+        logging.info(
+            f"[EventGridTrigger] Queued survey JSON for processing: {blob_url}"
+        )
+
+
+# -------------------------------
+# Survey JSON Queue Processor (pretty long running ops)
+# -------------------------------
+
+
+@app.queue_trigger(
+    arg_name="msg", queue_name="survey-processing", connection="AzureWebJobsStorage"
+)
+async def process_survey_queue(msg: func.QueueMessage):
+    """
+    Processes survey JSON files from queue (can take 90+ minutes).
+    Downloads JSON, converts to markdown using OpenAI, uploads result.
+    """
+    start_time = time.time()
+
+    try:
+        message_data = json.loads(msg.get_body().decode("utf-8"))
+        blob_url = message_data["blobUrl"]
+
+        # event grid Format: /blobServices/default/containers/survey-json-intermediate/blobs/filename.json
+        filename = blob_url.split("/blobs/")[-1]
+        base_name = filename.replace(".json", "")
+
+        logging.info(f"[process_survey_queue] Processing started: {filename}")
+
+        # Download JSON from blob storage
+        storage_account = os.getenv("AZURE_STORAGE_ACCOUNT")
+        blob_download_url = f"https://{storage_account}.blob.core.windows.net/survey-json-intermediate/{filename}"
+        blob_client = BlobStorageClient(file_url=blob_download_url)
+        json_bytes = blob_client.download_blob()
+        json_str = json_bytes.decode("utf-8")
+        grouped_records = json.loads(json_str)
+
+        # Get source metadata
+        source_metadata = blob_client.get_metadata()
+        source_file_directory = source_metadata.get("source_file_directory", "")
+        source_file_name = source_metadata.get("source_file_name", "")
+
+        logging.info(
+            f"[process_survey_queue][{filename}] Loaded {len(grouped_records)} records"
+        )
+
+        model = os.getenv("PULSE_SERIALIZATION_MODEL", "gpt-4.1-mini")
+        max_concurrent = int(os.getenv("PULSE_MAX_CONCURRENT", "20"))
+
+        markdown_content = await process_json_to_markdown_in_memory(
+            grouped_records=grouped_records,
+            filename=filename,
+            model=model,
+            max_concurrent=max_concurrent,
+        )
+
+        output_container = "survey-markdown"
+        output_filename = f"{base_name}.md"
+        output_url = f"https://{storage_account}.blob.core.windows.net/{output_container}/{output_filename}"
+
+        elapsed_time = time.time() - start_time
+
+        # prep metadata for output blob
+        output_metadata = {
+            "source_file_directory": source_file_directory,
+            "source_file_name": source_file_name,
+            "duration_seconds": str(round(elapsed_time, 2)),
+            "processed_at": datetime.datetime.fromtimestamp(start_time).isoformat()
+        }
+
+        output_blob_client = BlobStorageClient(output_url)
+        output_blob_client.upload_blob(
+            data=markdown_content.encode("utf-8"),
+            overwrite=True,
+            content_type="text/markdown",
+            metadata=output_metadata
+        )
+
+        logging.info(
+            f"[process_survey_queue][{filename}] Completed successfully in {elapsed_time:.2f} seconds. "
+            f"Output: {output_filename}"
+        )
+
+    except json.JSONDecodeError as e:
+        logging.error(f"[process_survey_queue] Invalid JSON format: {e}", exc_info=True)
+        raise 
+    except Exception as e:
+        elapsed_time = time.time() - start_time
+        logging.error(
+            f"[process_survey_queue] Processing failed after {elapsed_time:.2f} seconds: {e}",
+            exc_info=True,
+        )
+        raise  
+
+# -------------------------------
+# Survey JSON Processing HTTP Trigger (for local development)
+# -------------------------------
+
+
+@app.route(route="process-survey-local", auth_level=func.AuthLevel.FUNCTION)
+async def process_survey_http(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    HTTP trigger for local testing of survey JSON processing.
+    Downloads blob from survey-json-intermediate, processes it, and uploads to survey-markdown.
+
+    Request body:
+    {
+        "blobName": "filename.json"
+    }
+    """
+    start_time = time.time()
+
+    try:
+        body = req.get_json()
+        blob_name = body.get("blobName")
+
+        if not blob_name:
+            return func.HttpResponse(
+                json.dumps({"error": "Missing 'blobName' in request body"}),
+                status_code=400,
+                mimetype="application/json",
+            )
+
+        if not blob_name.endswith(".json"):
+            blob_name = f"{blob_name}.json"
+
+        base_name = blob_name.replace(".json", "")
+        logging.info(f"[process_survey_http] Processing: {blob_name}")
+
+        storage_account = os.getenv("AZURE_STORAGE_ACCOUNT")
+
+        input_url = f"https://{storage_account}.blob.core.windows.net/survey-json-intermediate/{blob_name}"
+        input_blob_client = BlobStorageClient(input_url)
+        json_bytes = input_blob_client.download_blob()
+        json_str = json_bytes.decode("utf-8")
+        grouped_records = json.loads(json_str)
+
+        # Get source metadata
+        source_metadata = input_blob_client.get_metadata()
+        source_file_directory = source_metadata.get("source_file_directory", "")
+        source_file_name = source_metadata.get("source_file_name", "")
+
+        logging.info(
+            f"[process_survey_http][{blob_name}] Loaded {len(grouped_records)} records"
+        )
+
+        model = os.getenv("PULSE_SERIALIZATION_MODEL", "gpt-4.1-mini")
+        max_concurrent = int(os.getenv("PULSE_MAX_CONCURRENT", "20"))
+
+        markdown_content = await process_json_to_markdown_in_memory(
+            grouped_records=grouped_records,
+            filename=blob_name,
+            model=model,
+            max_concurrent=max_concurrent,
+        )
+
+        output_filename = f"{base_name}.md"
+        output_url = f"https://{storage_account}.blob.core.windows.net/survey-markdown/{output_filename}"
+
+        elapsed_time = time.time() - start_time
+
+        # prep metadata for output blob
+        output_metadata = {
+            "source_file_directory": source_file_directory,
+            "source_file_name": source_file_name,
+            "duration_seconds": str(round(elapsed_time, 2)),
+            "processed_at": datetime.datetime.fromtimestamp(start_time).isoformat()
+        }
+
+        output_blob_client = BlobStorageClient(output_url)
+        output_blob_client.upload_blob(
+            data=markdown_content.encode("utf-8"),
+            overwrite=True,
+            content_type="text/markdown",
+            metadata=output_metadata
+        )
+
+        response = {
+            "status": "success",
+            "inputFile": blob_name,
+            "outputFile": output_filename,
+            "recordsProcessed": len(grouped_records),
+            "elapsedTimeSeconds": round(elapsed_time, 2),
+        }
+
+        logging.info(
+            f"[process_survey_http][{blob_name}] Completed in {elapsed_time:.2f} seconds"
+        )
+
+        return func.HttpResponse(
+            json.dumps(response, indent=2), status_code=200, mimetype="application/json"
+        )
+
+    except ValueError as e:
+        error_msg = f"Invalid request: {str(e)}"
+        logging.error(f"[process_survey_http] {error_msg}", exc_info=True)
+        return func.HttpResponse(
+            json.dumps({"error": error_msg}),
+            status_code=400,
+            mimetype="application/json",
+        )
+    except json.JSONDecodeError as e:
+        error_msg = f"Invalid JSON format: {str(e)}"
+        logging.error(f"[process_survey_http] {error_msg}", exc_info=True)
+        return func.HttpResponse(
+            json.dumps({"error": error_msg}),
+            status_code=400,
+            mimetype="application/json",
+        )
+    except Exception as e:
+        elapsed_time = time.time() - start_time
+        error_msg = f"Processing failed: {str(e)}"
+        logging.error(
+            f"[process_survey_http] {error_msg} (after {elapsed_time:.2f}s)",
+            exc_info=True,
+        )
+        return func.HttpResponse(
+            json.dumps(
+                {"error": error_msg, "elapsedTimeSeconds": round(elapsed_time, 2)}
+            ),
+            status_code=500,
+            mimetype="application/json",
+        )
 
 
 # -------------------------------
@@ -141,20 +394,24 @@ async def document_chunking(req: func.HttpRequest) -> func.HttpResponse:
 
                 if not content_type:
                     # Content type is missing entirely
-                    inferred_type = infer_content_type_from_url(input_data["documentUrl"])
+                    inferred_type = infer_content_type_from_url(
+                        input_data["documentUrl"]
+                    )
                     input_data["documentContentType"] = inferred_type
                     logging.warning(
-                        f'[document_chunking_function] documentContentType missing for {filename}. '
-                        f'Inferred from file extension: {inferred_type}'
+                        f"[document_chunking_function] documentContentType missing for {filename}. "
+                        f"Inferred from file extension: {inferred_type}"
                     )
                 elif content_type == "application/octet-stream":
                     # Content type is generic/unknown - try to infer better type from extension
-                    inferred_type = infer_content_type_from_url(input_data["documentUrl"])
+                    inferred_type = infer_content_type_from_url(
+                        input_data["documentUrl"]
+                    )
                     if inferred_type != "application/octet-stream":
                         input_data["documentContentType"] = inferred_type
                         logging.warning(
-                            f'[document_chunking_function] documentContentType was generic (application/octet-stream) for {filename}. '
-                            f'Inferred more specific type from file extension: {inferred_type}'
+                            f"[document_chunking_function] documentContentType was generic (application/octet-stream) for {filename}. "
+                            f"Inferred more specific type from file extension: {inferred_type}"
                         )
 
                 logging.info(

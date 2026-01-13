@@ -1,17 +1,10 @@
 import logging
 from .chunkers.doc_analysis_chunker import DocAnalysisChunker
 from .chunkers.langchain_chunker import LangChainChunker
-from .exceptions import DocIntNotAvailableError
-from tools import DocumentIntelligenceClient
 
 
 class ChunkerFactory:
     """Factory class to create appropriate chunker based on file extension."""
-
-    def __init__(self):
-        # needs to check if docint_40_api is available
-        docint_client = DocumentIntelligenceClient()
-        self.docint_40_api = docint_client.docint_40_api
 
     def get_chunker(self, extension, data):
         """
@@ -28,18 +21,18 @@ class ChunkerFactory:
         logging.info(f"[chunker_factory][{filename}] Creating chunker")
 
         extension = extension.lower()
-        if extension in ("pdf", "png", "jpeg", "jpg", "bmp", "tiff"):
+        if extension in (
+            "pdf",
+            "png",
+            "jpeg",
+            "jpg",
+            "bmp",
+            "tiff",
+            "docx",
+            "pptx",
+            "html",
+        ):
             return DocAnalysisChunker(data)
-        elif extension in ("docx", "pptx"):
-            if self.docint_40_api:
-                return DocAnalysisChunker(data)
-            else:
-                logging.info(
-                    f"[chunker_factory][{filename}] Processing 'pptx' and 'docx' files requires Doc Intelligence 4.0."
-                )
-                raise DocIntNotAvailableError(
-                    "Processing 'pptx' and 'docx' files requires Doc Intelligence 4.0."
-                )
         else:
             return LangChainChunker(data)
 
@@ -51,5 +44,15 @@ class ChunkerFactory:
         Returns:
             str: A comma-separated list of supported file extensions.
         """
-        extensions = ["pdf", "png", "jpeg", "jpg", "bmp", "tiff", "docx", "pptx"]
+        extensions = [
+            "pdf",
+            "png",
+            "jpeg",
+            "jpg",
+            "bmp",
+            "tiff",
+            "docx",
+            "pptx",
+            "html",
+        ]
         return ", ".join(extensions)

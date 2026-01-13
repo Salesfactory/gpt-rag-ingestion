@@ -7,7 +7,7 @@ This guide explains how to enable and configure the new multimodal document proc
 ## Features
 
 - **Document Layout Analysis**: Uses Azure Document Intelligence Layout model for structured text and image extraction
-- **Image Description**: Generates technical descriptions of charts, diagrams, and figures using Azure OpenAI GPT-4V/GPT-4o
+- **Image Description**: Generates technical descriptions of charts, diagrams, and figures using Azure OpenAI gpt-4.1
 - **Image Storage**: Stores extracted images in Azure Blob Storage with consistent naming
 - **Dual Embeddings**: Creates vector embeddings for both text content and image descriptions
 - **Location Metadata**: Preserves page numbers and bounding polygon information for precise content location
@@ -28,7 +28,7 @@ Copy `local.settings.multimodal.json.template` to `local.settings.json` and conf
 #### Azure OpenAI for Image Description
 ```json
 "AZURE_OPENAI_ENDPOINT": "https://your-openai-service.openai.azure.com/",
-"AZURE_OPENAI_CHAT_DEPLOYMENT": "gpt-4o",
+"AZURE_OPENAI_CHAT_DEPLOYMENT": "gpt-4.1",
 "AZURE_OPENAI_API_VERSION": "2025-01-01-preview",
 "IMAGE_DESCRIPTION_BATCH_SIZE": "5",
 "IMAGE_DESCRIPTION_TIMEOUT": "30"
@@ -44,7 +44,7 @@ The ingestion service automatically builds the endpoint as `https://<account>.bl
 ### Azure Services Required
 
 1. **Azure Document Intelligence**: Standard (S0) tier with Layout model support
-2. **Azure OpenAI**: With GPT-4V/GPT-4o deployment for image descriptions
+2. **Azure OpenAI**: With gpt-4.1 deployment for image descriptions
 3. **Azure Blob Storage**: For storing extracted images
 4. **Azure AI Search**: For indexing multimodal content
 
@@ -117,7 +117,7 @@ The multimodal functionality requires specific Azure regions:
    - Verify Document Intelligence API version is `2025-05-01-preview` or later
 
 2. **"Image description failed"**
-   - Verify Azure OpenAI GPT-4V/GPT-4o deployment
+   - Verify Azure OpenAI gpt-4.1 deployment
    - Check API keys and endpoint configuration
    - Review rate limiting settings
 

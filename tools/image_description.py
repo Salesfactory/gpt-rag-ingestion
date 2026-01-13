@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class ImageDescriptionClient:
     """
-    A client for generating technical descriptions of images using Azure OpenAI GPT-4V/GPT-4o.
+    A client for generating technical descriptions of images using Azure OpenAI gpt-4.1.
 
     This replaces the Content Understanding service to avoid performance bottlenecks while
     maintaining the same functionality as Azure AI Search multimodal skillsets.
