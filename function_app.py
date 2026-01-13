@@ -128,7 +128,7 @@ def EventGridTrigger(event: func.EventGridEvent, msg: func.Out[str]):
         message_data = {
             "blobUrl": blob_url,
             "eventType": event_type,
-            "eventTime": event.event_time,
+            "eventTime": event.event_time.isoformat() if event.event_time else None,
         }
         msg.set(json.dumps(message_data))
         logging.info(
