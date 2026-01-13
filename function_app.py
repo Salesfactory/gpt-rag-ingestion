@@ -1,17 +1,16 @@
-# test change
 import logging
 import json
 import os
 import time
 import datetime
-from json import JSONEncoder
 
 import jsonschema
 import azure.functions as func
 
 from chunking import DocumentChunker
-from tools import BlobStorageClient
-from utils.file_utils import get_filename
+from tools import BlobStorageClient, AISearchClient
+from utils.file_utils import get_filename, infer_content_type_from_url
+from utils.schemas import DateTimeEncoder, get_document_chunking_request_schema
 from survey import process_json_to_markdown_in_memory
 
 # -------------------------------
@@ -43,62 +42,6 @@ for logger_name in suppress_loggers:
     logger.propagate = False
 
 # -------------------------------
-# Helper Functions
-# -------------------------------
-
-
-def infer_content_type_from_url(url: str) -> str:
-    """
-    Infer content type from file extension when blob metadata doesn't include it.
-
-    Args:
-        url: Document URL with file extension
-
-    Returns:
-        MIME type string
-    """
-    ext = url.lower().split(".")[-1] if "." in url else ""
-
-    content_type_map = {
-        # Text formats
-        "txt": "text/plain",
-        "html": "text/html",
-        "htm": "text/html",
-        "json": "application/json",
-        "xml": "application/xml",
-        "csv": "text/csv",
-        "md": "text/markdown",
-        "py": "text/x-python",
-        # Document formats
-        "pdf": "application/pdf",
-        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "doc": "application/msword",
-        "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "ppt": "application/vnd.ms-powerpoint",
-        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "xls": "application/vnd.ms-excel",
-        # Image formats
-        "png": "image/png",
-        "jpg": "image/jpeg",
-        "jpeg": "image/jpeg",
-        "gif": "image/gif",
-        "bmp": "image/bmp",
-        "tiff": "image/tiff",
-        "tif": "image/tiff",
-    }
-
-    inferred_type = content_type_map.get(ext, "application/octet-stream")
-
-    if inferred_type == "application/octet-stream" and ext:
-        logging.warning(
-            f"[infer_content_type] Unknown file extension '.{ext}' for URL: {url}. "
-            f"Using default: application/octet-stream"
-        )
-
-    return inferred_type
-
-
-# -------------------------------
 # Azure Functions
 # -------------------------------
 
@@ -106,7 +49,7 @@ app = func.FunctionApp()
 
 
 # -------------------------------
-# Event Grid Trigger Function
+# Event Grid Trigger Function (for json-intermediate)
 # -------------------------------
 
 
@@ -133,6 +76,39 @@ def EventGridTrigger(event: func.EventGridEvent, msg: func.Out[str]):
         msg.set(json.dumps(message_data))
         logging.info(
             f"[EventGridTrigger] Queued survey JSON for processing: {blob_url}"
+        )
+
+
+# -------------------------------
+# Event Grid Trigger for survey-markdown indexing
+# -------------------------------
+
+
+@app.event_grid_trigger(arg_name="event")
+async def EventGridTriggerSurveyMarkdownIndexer(
+    event: func.EventGridEvent,
+):
+    """
+    Triggers an Azure AI Search indexer run when a new blob arrives in survey-markdown.
+    """
+    event_type = event.event_type
+    blob_subject = event.subject or ""
+
+    if event_type != "Microsoft.Storage.BlobCreated":
+        logging.debug(f"[survey-markdown-indexer] Ignoring event type: {event_type}")
+        return
+
+    pulse_indexer_name = "pulse-indexer"
+    try:
+        async with AISearchClient() as client:
+            await client.run_indexer(pulse_indexer_name)
+            logging.info(
+                f"[survey-markdown-indexer] Triggered indexer '{pulse_indexer_name}' for {blob_subject}"
+            )
+    except Exception as exc:
+        logging.error(
+            f"[survey-markdown-indexer] Failed to run indexer '{pulse_indexer_name}': {exc}",
+            exc_info=True,
         )
 
 
@@ -201,7 +177,7 @@ async def process_survey_queue(msg: func.QueueMessage):
             "source_file_container": source_file_container,
             "source_file_name": source_file_name,
             "duration_seconds": str(round(elapsed_time, 2)),
-            "processed_at": datetime.datetime.fromtimestamp(start_time).isoformat()
+            "processed_at": datetime.datetime.fromtimestamp(start_time).isoformat(),
         }
 
         output_blob_client = BlobStorageClient(output_url)
@@ -209,7 +185,7 @@ async def process_survey_queue(msg: func.QueueMessage):
             data=markdown_content.encode("utf-8"),
             overwrite=True,
             content_type="text/markdown",
-            metadata=output_metadata
+            metadata=output_metadata,
         )
 
         logging.info(
@@ -219,14 +195,15 @@ async def process_survey_queue(msg: func.QueueMessage):
 
     except json.JSONDecodeError as e:
         logging.error(f"[process_survey_queue] Invalid JSON format: {e}", exc_info=True)
-        raise 
+        raise
     except Exception as e:
         elapsed_time = time.time() - start_time
         logging.error(
             f"[process_survey_queue] Processing failed after {elapsed_time:.2f} seconds: {e}",
             exc_info=True,
         )
-        raise  
+        raise
+
 
 # -------------------------------
 # Survey JSON Processing HTTP Trigger (for local development)
@@ -302,7 +279,7 @@ async def process_survey_http(req: func.HttpRequest) -> func.HttpResponse:
             "source_file_container": source_file_container,
             "source_file_name": source_file_name,
             "duration_seconds": str(round(elapsed_time, 2)),
-            "processed_at": datetime.datetime.fromtimestamp(start_time).isoformat()
+            "processed_at": datetime.datetime.fromtimestamp(start_time).isoformat(),
         }
 
         output_blob_client = BlobStorageClient(output_url)
@@ -310,7 +287,7 @@ async def process_survey_http(req: func.HttpRequest) -> func.HttpResponse:
             data=markdown_content.encode("utf-8"),
             overwrite=True,
             content_type="text/markdown",
-            metadata=output_metadata
+            metadata=output_metadata,
         )
 
         response = {
@@ -371,7 +348,7 @@ async def process_survey_http(req: func.HttpRequest) -> func.HttpResponse:
 async def document_chunking(req: func.HttpRequest) -> func.HttpResponse:
     try:
         body = req.get_json()
-        jsonschema.validate(body, schema=get_request_schema())
+        jsonschema.validate(body, schema=get_document_chunking_request_schema())
 
         if body:
             # Log the incoming request
@@ -515,45 +492,3 @@ async def document_chunking(req: func.HttpRequest) -> func.HttpResponse:
         error_message = f"An unexpected error occured: {str(e)}"
         logging.error(f"[document_chunking_function] {error_message}", exc_info=True)
         return func.HttpResponse(error_message, status_code=500)
-
-
-class DateTimeEncoder(JSONEncoder):
-    # Override the default method
-    def default(self, obj):
-        if isinstance(obj, (datetime.date, datetime.datetime)):
-            return obj.isoformat()
-        return super().default(obj)
-
-
-def get_request_schema():
-    return {
-        "$schema": "http://json-schema.org/draft-04/schema#",
-        "type": "object",
-        "properties": {
-            "values": {
-                "type": "array",
-                "minItems": 1,
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "recordId": {"type": "string"},
-                        "data": {
-                            "type": "object",
-                            "properties": {
-                                "documentUrl": {"type": "string", "minLength": 1},
-                                "documentSasToken": {"type": "string", "minLength": 0},
-                                "documentContentType": {
-                                    "type": "string",
-                                    "minLength": 1,
-                                },
-                                "includeVectors": {"type": "boolean"},
-                            },
-                            "required": ["documentUrl"],
-                        },
-                    },
-                    "required": ["recordId", "data"],
-                },
-            }
-        },
-        "required": ["values"],
-    }

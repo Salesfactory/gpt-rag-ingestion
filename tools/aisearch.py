@@ -1,6 +1,7 @@
 import os
 import logging
 from azure.search.documents.aio import SearchClient
+from azure.search.documents.indexes.aio import SearchIndexerClient
 from azure.search.documents.models import SearchMode
 from azure.core.exceptions import AzureError
 from azure.identity.aio import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential
@@ -33,6 +34,7 @@ class AISearchClient:
             raise
 
         self.clients = {}  # Cache SearchClient instances per index
+        self.indexer_client: str = None
 
     async def get_search_client(self, index_name: str) -> SearchClient:
         """
@@ -56,6 +58,25 @@ class AISearchClient:
                 logging.error(f"[aisearch] Failed to initialize SearchClient for index '{index_name}': {e}")
                 raise
         return self.clients[index_name]
+
+    async def get_indexer_client(self) -> SearchIndexerClient:
+        """
+        Retrieves a SearchIndexerClient or creates a new one if not cached.
+
+        Returns:
+            SearchIndexerClient: An instance of SearchIndexerClient.
+        """
+        if self.indexer_client is None:
+            try:
+                self.indexer_client = SearchIndexerClient(
+                    endpoint=self.endpoint,
+                    credential=self.credential,
+                )
+                logging.debug("[aisearch] Initialized SearchIndexerClient.")
+            except Exception as e:
+                logging.error(f"[aisearch] Failed to initialize SearchIndexerClient: {e}")
+                raise
+        return self.indexer_client
 
     async def index_document(self, index_name: str, document: dict):
         """
@@ -198,6 +219,22 @@ class AISearchClient:
             logging.error(f"[aisearch] Unexpected error while searching documents in '{index_name}': {e}")
             return {"count": 0, "documents": [], "error": str(e)}
 
+    async def run_indexer(self, indexer_name: str) -> None:
+        """
+        Runs a Search indexer by name.
+
+        Parameters:
+            indexer_name (str): The name of the Azure AI Search indexer to run.
+        """
+        client = await self.get_indexer_client()
+        try:
+            await client.run_indexer(indexer_name)
+            logging.info(f"[aisearch] Ran indexer '{indexer_name}'.")
+        except AzureError as e:
+            logging.error(f"[aisearch] AzureError while running indexer '{indexer_name}': {e}")
+        except Exception as e:
+            logging.error(f"[aisearch] Unexpected error while running indexer '{indexer_name}': {e}")
+
     async def close(self):
         """
         Closes all SearchClient instances and the credential.
@@ -207,7 +244,21 @@ class AISearchClient:
             logging.debug(f"[aisearch] Closed SearchClient for index '{index_name}'.")
         self.clients.clear()
 
+        if self.indexer_client is not None:
+            await self.indexer_client.close()
+            self.indexer_client = None
+            logging.debug("[aisearch] Closed SearchIndexerClient.")
+
         # Close the ChainedTokenCredential if it has a close method
         if hasattr(self.credential, "close"):
             await self.credential.close()
             logging.debug("[aisearch] Closed ChainedTokenCredential.")
+
+    async def __aenter__(self):
+        """Enter async context manager."""
+        return self
+
+    async def __aexit__(self, _exc_type, _exc_val, _exc_tb):
+        """Exit async context manager and close all resources."""
+        await self.close()
+        return False
