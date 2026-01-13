@@ -53,7 +53,7 @@ app = func.FunctionApp()
 # -------------------------------
 
 
-@app.route(route="health", auth_level=func.AuthLevel.ANONYMOUS)
+@app.route(route="health", methods=[func.HttpMethod.GET], auth_level=func.AuthLevel.ANONYMOUS)
 async def health_check(_req: func.HttpRequest) -> func.HttpResponse:
     """
     Health check endpoint for Azure App Service health monitoring.
