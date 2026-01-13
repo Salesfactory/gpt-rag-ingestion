@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import time
 from io import StringIO
 from typing import Any, Dict, List
@@ -7,6 +8,8 @@ from openai import AsyncOpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 def records_to_string(data: Dict[str, Dict[str, float]]) -> str:
@@ -87,7 +90,7 @@ async def process_grouped_record_in_memory(
     data = record["data"]
 
     column_display = column.replace("by_", "").replace("_", " ").title()
-    print(f"[{filename}] Processing: {parent_category} - {column_display}...")
+    logger.info(f"[{filename}] Processing: {parent_category} - {column_display}...")
 
     try:
         summary = await summarize_grouped_data(
@@ -99,9 +102,12 @@ async def process_grouped_record_in_memory(
             output.write(summary)
             output.write("\n\n---\n")
 
-        print(f"[{filename}] Completed: {parent_category} - {column_display}")
+        logger.info(f"[{filename}] Completed: {parent_category} - {column_display}")
     except Exception as e:
-        print(f"[{filename}] Error processing {parent_category} - {column_display}: {e}")
+        logger.error(
+            f"[{filename}] Error processing {parent_category} - {column_display}: {e}",
+            exc_info=True
+        )
 
 
 async def process_grouped_record(
@@ -118,7 +124,7 @@ async def process_grouped_record(
     data = record["data"]
 
     column_display = column.replace("by_", "").replace("_", " ").title()
-    print(f"Processing: {parent_category} - {column_display}...")
+    logger.info(f"Processing: {parent_category} - {column_display}...")
 
     try:
         summary = await summarize_grouped_data(
@@ -131,9 +137,12 @@ async def process_grouped_record(
                 f.write(summary)
                 f.write("\n\n---\n")
 
-        print(f"Completed: {parent_category} - {column_display}")
+        logger.info(f"Completed: {parent_category} - {column_display}")
     except Exception as e:
-        print(f"Error processing {parent_category} - {column_display}: {e}")
+        logger.error(
+            f"Error processing {parent_category} - {column_display}: {e}",
+            exc_info=True
+        )
 
 
 async def process_json_to_markdown_in_memory(
@@ -154,7 +163,7 @@ async def process_json_to_markdown_in_memory(
         Markdown string with all processed content
     """
     start_time = time.time()
-    print(f"[{filename}] Processing {len(grouped_records)} grouped records")
+    logger.info(f"[{filename}] Processing {len(grouped_records)} grouped records")
 
     # Initialize markdown content with header
     section = grouped_records[0].get("section", "Unknown") if grouped_records else "Unknown"
@@ -170,13 +179,28 @@ async def process_json_to_markdown_in_memory(
             await process_grouped_record_in_memory(client, record, output, lock, model, filename)
 
     tasks = [limited_process(record) for record in grouped_records]
-    await asyncio.gather(*tasks)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Check if all tasks failed
+    errors = [r for r in results if isinstance(r, Exception)]
+    if errors:
+        logger.warning(f"[{filename}] {len(errors)} tasks failed during processing")
+        for i, error in enumerate(errors[:5]):  # Log first 5 errors
+            logger.error(f"[{filename}] Task error {i+1}: {error}", exc_info=error)
 
     elapsed_time = time.time() - start_time
     result = output.getvalue()
     output.close()
 
-    print(f"[{filename}] Processing complete in {elapsed_time:.2f} seconds")
+    logger.info(f"[{filename}] Processing complete in {elapsed_time:.2f} seconds")
+
+    # Warn if only header was generated (indicates all processing failed)
+    if len(result.strip()) <= len(f"# {section} Analysis") + 10:
+        logger.error(
+            f"[{filename}] WARNING: Output contains only header! "
+            f"All {len(grouped_records)} records may have failed processing."
+        )
+
     return result
 
 
@@ -192,7 +216,7 @@ async def process_json_to_markdown(
     with open(input_json_path, "r", encoding="utf-8") as f:
         grouped_records = json.load(f)
 
-    print(f"Loaded {len(grouped_records)} grouped records")
+    logger.info(f"Loaded {len(grouped_records)} grouped records")
 
     # Initialize output file with header
     section = grouped_records[0].get("section", "Unknown") if grouped_records else "Unknown"
@@ -208,11 +232,18 @@ async def process_json_to_markdown(
             await process_grouped_record(client, record, output_md_path, lock, model)
 
     tasks = [limited_process(record) for record in grouped_records]
-    await asyncio.gather(*tasks)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Check if all tasks failed
+    errors = [r for r in results if isinstance(r, Exception)]
+    if errors:
+        logger.warning(f"{len(errors)} tasks failed during processing")
+        for i, error in enumerate(errors[:5]):
+            logger.error(f"Task error {i+1}: {error}", exc_info=error)
 
     elapsed_time = time.time() - start_time
-    print(f"\nDone! Output written to: {output_md_path}")
-    print(f"Total time: {elapsed_time:.2f} seconds")
+    logger.info(f"\nDone! Output written to: {output_md_path}")
+    logger.info(f"Total time: {elapsed_time:.2f} seconds")
 
 
 def main():
