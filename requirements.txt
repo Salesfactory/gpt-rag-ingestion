@@ -11,6 +11,7 @@ azure-search-documents==11.5.2
 azure-storage-blob
 msgraph-sdk==1.5.4
 azurefunctions-extensions-http-fastapi==1.0.1
+azurefunctions-extensions-base==1.0.0b2
 
 # Data handling and validation dependencies
 jsonschema
