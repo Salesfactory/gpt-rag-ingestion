@@ -8,6 +8,7 @@ import jsonschema
 import azure.functions as func
 
 from chunking import DocumentChunker
+from azurefunctions.extensions.http.fastapi import Request, Response
 from tools import BlobStorageClient, AISearchClient
 from utils.file_utils import get_filename, infer_content_type_from_url
 from utils.schemas import DateTimeEncoder, get_document_chunking_request_schema
@@ -54,15 +55,15 @@ app = func.FunctionApp()
 
 
 @app.route(route="health", methods=[func.HttpMethod.GET], auth_level=func.AuthLevel.ANONYMOUS)
-async def health_check(_req: func.HttpRequest) -> func.HttpResponse:
+async def health_check(req: Request) -> Response:
     """
     Health check endpoint for Azure App Service health monitoring.
-    Pinged by Azure's health check feature at 1-minute intervals.
+    pinged by Azure's health check feature at 1-minute intervals
 
     Returns:
         200 OK when the application is healthy
     """
-    return func.HttpResponse("OK", status_code=200)
+    return Response("OK", status_code=200, media_type="text/plain")
 
 
 # -------------------------------
