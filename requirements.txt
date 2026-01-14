@@ -1,15 +1,11 @@
 # Azure Functions dependencies
 azure-functions
-azurefunctions-extensions-bindings-blob
 
 # Azure SDK dependencies
 azure-identity
 azure-keyvault-secrets
-azure-mgmt-web
-azure-mgmt-storage
 azure-search-documents==11.5.2
 azure-storage-blob
-msgraph-sdk==1.5.4
 azurefunctions-extensions-http-fastapi==1.0.1
 azurefunctions-extensions-base==1.0.0b2
 
@@ -17,20 +13,13 @@ azurefunctions-extensions-base==1.0.0b2
 jsonschema
 python-dotenv
 requests
-openpyxl==3.1.5
-tabulate==0.9.0
 
 # AI and NLP dependencies
 tiktoken==0.7.0
 langchain==0.0.329
 openai==2.11.0
 
-# Error handling
-tenacity==8.5.0
-
-# Web and async dependencies
-aiohttp==3.9.0b0
-webvtt-py==0.5.1
+# Utilities
 psutil
 # Testing dependencies
 pytest
@@ -41,7 +30,4 @@ pytest-asyncio
 # Manually managing azure-functions-worker may cause unexpected issues
 azure-ai-documentintelligence==1.0.0b4
 Pillow
-types-Pillow
-pypdf
 PyMuPDF
-rich
