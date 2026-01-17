@@ -161,7 +161,7 @@ async def process_survey_queue(msg: func.QueueMessage):
         source_file_directory = source_metadata.get("source_file_directory", "")
         source_file_name = source_metadata.get("source_file_name", "")
         source_file_container = source_metadata.get("source_file_container", "")
-        source_date_uploaded = source_metadata.get("date_uploaded", "")
+        date_uploaded = source_metadata.get("date_uploaded", "")
 
         logging.info(
             f"[process_survey_queue][{filename}] Loaded {len(grouped_records)} records"
@@ -266,6 +266,7 @@ async def process_survey_http(req: func.HttpRequest) -> func.HttpResponse:
         source_file_directory = source_metadata.get("source_file_directory", "")
         source_file_container = source_metadata.get("source_file_container", "")
         source_file_name = source_metadata.get("source_file_name", "")
+        date_uploaded = source_metadata.get("date_uploaded", "")
 
         logging.info(
             f"[process_survey_http][{blob_name}] Loaded {len(grouped_records)} records"
@@ -291,6 +292,7 @@ async def process_survey_http(req: func.HttpRequest) -> func.HttpResponse:
             "source_file_directory": source_file_directory,
             "source_file_container": source_file_container,
             "source_file_name": source_file_name,
+            "date_uploaded": date_uploaded,
             "duration_seconds": str(round(elapsed_time, 2)),
             "processed_at": datetime.datetime.fromtimestamp(start_time).isoformat(),
         }
