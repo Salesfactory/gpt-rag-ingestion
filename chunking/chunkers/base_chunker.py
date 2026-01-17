@@ -223,44 +223,67 @@ class BaseChunker:
             "page": page,
         }
 
-    def _get_date_uploaded_from_metadata(self):
+    def _is_valid_datetime_offset(self, date_str):
         """
-        Retrieves the date_uploaded from blob metadata, or returns current timestamp if not available.
+        Validates if a date string meets Edm.DateTimeOffset requirements for freshness scoring.
+
+        Args:
+            date_str (str): The date string to validate
 
         Returns:
-            str: ISO formatted date string
+            bool: True if valid ISO 8601 format with timezone, False otherwise
+        """
+        if not date_str:
+            return False
+
+        try:
+            parsed_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            return parsed_date.tzinfo is not None
+        except (ValueError, AttributeError):
+            return False
+
+    def _get_date_uploaded_from_metadata(self):
+        """
+        Retrieves the date_uploaded from blob metadata, or falls back to Azure's last_modified timestamp.
+
+        Priority:
+        1. Custom blob metadata field 'date_uploaded' (if valid Edm.DateTimeOffset format)
+        2. Azure Storage's last_modified timestamp
+        3. Current timestamp (only if both above fail)
+
+        Returns:
+            str: ISO formatted date string with timezone
         """
         try:
-
-            # Create blob client to get metadata
             blob_client = BlobStorageClient(self.file_url)
             metadata = blob_client.get_metadata()
 
-            # Get date_uploaded from metadata
+            # Try custom metadata first
             date_uploaded = metadata.get("date_uploaded")
-
-            if date_uploaded:
+            if date_uploaded and self._is_valid_datetime_offset(date_uploaded):
                 logging.debug(
-                    f"[base_chunker][{self.filename}] Using date_uploaded from metadata: {date_uploaded}"
+                    f"[base_chunker][{self.filename}] Using date_uploaded from custom metadata: {date_uploaded}"
                 )
                 return date_uploaded
-            else:
-                logging.debug(
-                    f"[base_chunker][{self.filename}] No date_uploaded in metadata, using current time"
+
+            if date_uploaded:
+                logging.warning(
+                    f"[base_chunker][{self.filename}] Invalid date_uploaded format '{date_uploaded}', falling back to last_modified"
                 )
-                # Fallback to current time if not in metadata
-                return (
-                    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
-                    + "Z"
-                )
+
+            # Fallback to Azure's last_modified
+            last_modified = blob_client.get_last_modified()
+            date_str = last_modified.isoformat()
+            logging.debug(
+                f"[base_chunker][{self.filename}] Using Azure last_modified: {date_str}"
+            )
+            return date_str
 
         except Exception as e:
             logging.warning(
-                f"[base_chunker][{self.filename}] Error retrieving date_uploaded from metadata: {e}. Using current time."
+                f"[base_chunker][{self.filename}] Error retrieving date: {e}. Using current time."
             )
-            return (
-                datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-            )
+            return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
     def _extract_title_from_filename(self, filename):
         """

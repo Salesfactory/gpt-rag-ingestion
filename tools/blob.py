@@ -104,6 +104,14 @@ class BlobStorageClient:
         blob_metadata = blob_client.get_blob_properties().metadata
         return blob_metadata
 
+    def get_last_modified(self):
+        """
+        Retrieves the last modified timestamp from Azure Blob Storage.
+        """
+        blob_client = self.blob_service_client.get_blob_client(container=self.container_name, blob=self.blob_name)
+        blob_properties = blob_client.get_blob_properties()
+        return blob_properties.last_modified
+
     def upload_blob(self, data, overwrite=False, content_type=None, metadata=None):
         """
         Uploads data to the blob in Azure Blob Storage.
