@@ -342,7 +342,7 @@ def create_index_body(
                 "text": {"weights": {"content": 4, "keyPhrases": 5, "title": 7}},
                 "functions": [
                     {
-                        "fieldName": "date_last_modified",
+                        "fieldName": "date_uploaded",
                         "interpolation": "linear",
                         "type": "freshness",
                         "boost": 10,

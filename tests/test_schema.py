@@ -1,13 +1,13 @@
 import unittest
 import jsonschema
-from function_app import get_request_schema
+from utils.schemas import get_document_chunking_request_schema
 
 
 class TestSchema(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        self.schema = get_request_schema()
+        self.schema = get_document_chunking_request_schema()
     
     def test_valid_schema(self):
         """Test that valid data passes schema validation."""
