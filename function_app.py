@@ -9,6 +9,7 @@ import azure.functions as func
 
 from chunking import DocumentChunker
 from tools import BlobStorageClient, AISearchClient
+from tools.cleanup import run_search_index_cleanup
 from utils.file_utils import get_filename, infer_content_type_from_url
 from utils.schemas import DateTimeEncoder, get_document_chunking_request_schema
 from survey import process_json_to_markdown_in_memory
@@ -46,6 +47,7 @@ for logger_name in suppress_loggers:
 # -------------------------------
 
 app = func.FunctionApp()
+CLEANUP_INDEX_CRON_JOB = os.getenv("CLEANUP_INDEX_CRON_JOB", "0 0 * * * *")
 
 
 # -------------------------------
@@ -57,6 +59,107 @@ app = func.FunctionApp()
 def health_check(req: func.HttpRequest) -> func.HttpResponse:
     """Health check endpoint for Azure App Service health monitoring."""
     return func.HttpResponse("OK", status_code=200)
+
+
+# -------------------------------
+# index cleanup
+# -------------------------------
+
+
+def _resolve_index_cleanup_dry_run(req: func.HttpRequest = None) -> bool:
+    """
+    Resolve dry-run behavior from query string or environment default.
+    """
+    default_dry_run = (
+        os.getenv("CLEANUP_INDEX_DRY_RUN", "true").strip().lower() == "true"
+    )
+    if req is None:
+        return default_dry_run
+
+    dry_run_param = req.params.get("dry_run")
+    if dry_run_param is None:
+        return default_dry_run
+
+    normalized = dry_run_param.strip().lower()
+    if normalized not in {"true", "false"}:
+        raise ValueError("Invalid 'dry_run' query value. Use 'true' or 'false'.")
+
+    return normalized == "true"
+
+
+@app.timer_trigger(
+    schedule=CLEANUP_INDEX_CRON_JOB,
+    arg_name="timer",
+    run_on_startup=False,
+    use_monitor=True,
+)
+def scheduled_index_cleanup(timer: func.TimerRequest) -> None:
+    """
+    Scheduled cleanup of orphaned search documents across configured index/container targets.
+    """
+    logger = logging.getLogger("scheduled_index_cleanup")
+    logger.info(
+        "[scheduled_index_cleanup] Cleanup run started (schedule=%s)",
+        CLEANUP_INDEX_CRON_JOB,
+    )
+
+    if timer.past_due:
+        logger.warning("[scheduled_index_cleanup] Timer invocation is past due.")
+
+    try:
+        dry_run = _resolve_index_cleanup_dry_run()
+        result = run_search_index_cleanup(dry_run_override=dry_run)
+        logger.info(
+            "[scheduled_index_cleanup] Cleanup run completed: %s", json.dumps(result)
+        )
+    except Exception as exc:
+        logger.error(
+            "[scheduled_index_cleanup] Cleanup run failed: %s", exc, exc_info=True
+        )
+        raise
+
+
+@app.route(route="index-cleanup", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def manual_index_cleanup(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Manual cleanup endpoint for on-demand dry-run or delete execution.
+    """
+    logger = logging.getLogger("manual_index_cleanup")
+    logger.info("[manual_index_cleanup] Manual cleanup triggered")
+
+    try:
+        dry_run = _resolve_index_cleanup_dry_run(req)
+    except ValueError as exc:
+        return func.HttpResponse(
+            json.dumps({"status": "error", "error": str(exc)}),
+            status_code=400,
+            mimetype="application/json",
+        )
+
+    try:
+        result = run_search_index_cleanup(dry_run_override=dry_run)
+        status_code = 200 if result.get("status") != "error" else 500
+        return func.HttpResponse(
+            json.dumps(result, ensure_ascii=False, cls=DateTimeEncoder),
+            status_code=status_code,
+            mimetype="application/json",
+        )
+    except ValueError as exc:
+        logger.error(
+            "[manual_index_cleanup] Configuration error: %s", exc, exc_info=True
+        )
+        return func.HttpResponse(
+            json.dumps({"status": "error", "error": str(exc)}),
+            status_code=500,
+            mimetype="application/json",
+        )
+    except Exception as exc:
+        logger.error("[manual_index_cleanup] Unexpected error: %s", exc, exc_info=True)
+        return func.HttpResponse(
+            json.dumps({"status": "error", "error": str(exc)}),
+            status_code=500,
+            mimetype="application/json",
+        )
 
 
 # -------------------------------
