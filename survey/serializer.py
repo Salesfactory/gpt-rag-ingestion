@@ -46,6 +46,9 @@ CRITICAL CONTEXT REQUIREMENT (for RAG/retrieval chunking):
 WRITING STYLE:
 - Write in smooth, connected paragraphs, but keep it clear and concise.
 - Always write % symbol, never spell out "percent"
+- CRITICAL NUMBER FORMATTING:
+  * Decimal values between 0 and 1 (like 0.25, 0.3, 0.87) are percentages - multiply by 100 and add % symbol (25%, 30%, 87%)
+  * Whole numbers or values greater than 1 (like 5, 42, 150) are counts/integers - report as-is without % symbol
 - Repeat context in EVERY sentence using natural phrasing:
   * "For {parent_category} broken down by {column_display}, Gen Z shows..."
   * "Looking at {column_display} data for {parent_category}, Millennials..."
