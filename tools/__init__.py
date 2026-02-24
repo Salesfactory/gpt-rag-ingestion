@@ -6,7 +6,6 @@ from .aisearch import AISearchClient as AISearchClient
 from .doc_intelligence import DocumentIntelligenceClient as DocumentIntelligenceClient
 from .image_description import ImageDescriptionClient as ImageDescriptionClient
 from .multimodal_blob import MultimodalBlobClient as MultimodalBlobClient
-from .gdrive import GoogleDriveClient as GoogleDriveClient
 
 __all__ = [
     "AzureOpenAIClient",
@@ -17,5 +16,4 @@ __all__ = [
     "DocumentIntelligenceClient",
     "ImageDescriptionClient",
     "MultimodalBlobClient",
-    "GoogleDriveClient",
 ]
