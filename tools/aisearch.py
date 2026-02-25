@@ -1,10 +1,15 @@
 import os
 import logging
 from azure.search.documents.aio import SearchClient
-from azure.search.documents.indexes.aio import SearchIndexerClient
+from azure.search.documents.indexes.aio import SearchIndexClient, SearchIndexerClient
+from azure.search.documents.indexes.models import SearchIndex
 from azure.search.documents.models import SearchMode
 from azure.core.exceptions import AzureError
-from azure.identity.aio import ManagedIdentityCredential, AzureCliCredential, ChainedTokenCredential
+from azure.identity.aio import (
+    ManagedIdentityCredential,
+    AzureCliCredential,
+    ChainedTokenCredential,
+)
 from typing import Any, Dict, List, Optional
 
 
@@ -17,7 +22,9 @@ class AISearchClient:
     def __init__(self):
         self.search_service_name = os.getenv("AZURE_SEARCH_SERVICE")
         if not self.search_service_name:
-            logging.error("[aisearch] AZURE_SEARCH_SERVICE environment variable not set.")
+            logging.error(
+                "[aisearch] AZURE_SEARCH_SERVICE environment variable not set."
+            )
             raise ValueError("AZURE_SEARCH_SERVICE environment variable not set.")
 
         self.endpoint = f"https://{self.search_service_name}.search.windows.net"
@@ -25,10 +32,11 @@ class AISearchClient:
         # Initialize the ChainedTokenCredential
         try:
             self.credential = ChainedTokenCredential(
-                ManagedIdentityCredential(),
-                AzureCliCredential()
+                ManagedIdentityCredential(), AzureCliCredential()
             )
-            logging.debug("[aisearch] Initialized ChainedTokenCredential with ManagedIdentity and AzureCliCredential.")
+            logging.debug(
+                "[aisearch] Initialized ChainedTokenCredential with ManagedIdentity and AzureCliCredential."
+            )
         except Exception as e:
             logging.error(f"[aisearch] Failed to initialize credentials: {e}")
             raise
@@ -51,11 +59,15 @@ class AISearchClient:
                 self.clients[index_name] = SearchClient(
                     endpoint=self.endpoint,
                     index_name=index_name,
-                    credential=self.credential
+                    credential=self.credential,
                 )
-                logging.debug(f"[aisearch] Initialized SearchClient for index '{index_name}'.")
+                logging.debug(
+                    f"[aisearch] Initialized SearchClient for index '{index_name}'."
+                )
             except Exception as e:
-                logging.error(f"[aisearch] Failed to initialize SearchClient for index '{index_name}': {e}")
+                logging.error(
+                    f"[aisearch] Failed to initialize SearchClient for index '{index_name}': {e}"
+                )
                 raise
         return self.clients[index_name]
 
@@ -74,7 +86,9 @@ class AISearchClient:
                 )
                 logging.debug("[aisearch] Initialized SearchIndexerClient.")
             except Exception as e:
-                logging.error(f"[aisearch] Failed to initialize SearchIndexerClient: {e}")
+                logging.error(
+                    f"[aisearch] Failed to initialize SearchIndexerClient: {e}"
+                )
                 raise
         return self.indexer_client
 
@@ -91,14 +105,24 @@ class AISearchClient:
         try:
             result = await client.upload_documents(documents=[document])
             if result[0].succeeded:
-                logging.info(f"[aisearch] Successfully indexed document into '{index_name}'.")
+                logging.info(
+                    f"[aisearch] Successfully indexed document into '{index_name}'."
+                )
             else:
-                error_messages = "; ".join([error["error"] for error in result[0].error_messages])
-                logging.error(f"[aisearch] Failed to index document into '{index_name}': {error_messages}")
+                error_messages = "; ".join(
+                    [error["error"] for error in result[0].error_messages]
+                )
+                logging.error(
+                    f"[aisearch] Failed to index document into '{index_name}': {error_messages}"
+                )
         except AzureError as e:
-            logging.error(f"[aisearch] AzureError while indexing document into '{index_name}': {e}")
+            logging.error(
+                f"[aisearch] AzureError while indexing document into '{index_name}': {e}"
+            )
         except Exception as e:
-            logging.error(f"[aisearch] Unexpected error while indexing document into '{index_name}': {e}")
+            logging.error(
+                f"[aisearch] Unexpected error while indexing document into '{index_name}': {e}"
+            )
 
     async def delete_document(self, index_name: str, key_field: str, key_value: str):
         """
@@ -113,13 +137,21 @@ class AISearchClient:
 
         try:
             await client.delete_documents(key_field, [key_value])
-            logging.info(f"[aisearch] Successfully deleted document with {key_field}='{key_value}' from '{index_name}'.")
+            logging.info(
+                f"[aisearch] Successfully deleted document with {key_field}='{key_value}' from '{index_name}'."
+            )
         except AzureError as e:
-            logging.error(f"[aisearch] AzureError while deleting document from '{index_name}': {e}")
+            logging.error(
+                f"[aisearch] AzureError while deleting document from '{index_name}': {e}"
+            )
         except Exception as e:
-            logging.error(f"[aisearch] Unexpected error while deleting document from '{index_name}': {e}")
+            logging.error(
+                f"[aisearch] Unexpected error while deleting document from '{index_name}': {e}"
+            )
 
-    async def delete_documents(self, index_name: str, key_field: str, key_values: List[str]):
+    async def delete_documents(
+        self, index_name: str, key_field: str, key_values: List[str]
+    ):
         """
         Deletes multiple documents from the specified Azure Cognitive Search index.
 
@@ -136,7 +168,10 @@ class AISearchClient:
 
         try:
             # Prepare the delete actions
-            actions = [{"@search.action": "delete", key_field: key_value} for key_value in key_values]
+            actions = [
+                {"@search.action": "delete", key_field: key_value}
+                for key_value in key_values
+            ]
 
             # Azure Cognitive Search supports batch operations, but there might be limits on batch size.
             # Here, we assume that the list is within acceptable limits. For very large lists, consider batching.
@@ -150,16 +185,28 @@ class AISearchClient:
                     succeeded += 1
                 else:
                     failed += 1
-                    error_messages = "; ".join([error["error"] for error in res.error_messages])
-                    logging.error(f"[aisearch] Failed to delete a document: {error_messages}")
+                    error_messages = "; ".join(
+                        [error["error"] for error in res.error_messages]
+                    )
+                    logging.error(
+                        f"[aisearch] Failed to delete a document: {error_messages}"
+                    )
 
-            logging.info(f"[aisearch] Deleted {succeeded} documents from '{index_name}'.")
+            logging.info(
+                f"[aisearch] Deleted {succeeded} documents from '{index_name}'."
+            )
             if failed > 0:
-                logging.warning(f"[aisearch] Failed to delete {failed} documents from '{index_name}'. Check logs for details.")
+                logging.warning(
+                    f"[aisearch] Failed to delete {failed} documents from '{index_name}'. Check logs for details."
+                )
         except AzureError as e:
-            logging.error(f"[aisearch] AzureError while deleting documents from '{index_name}': {e}")
+            logging.error(
+                f"[aisearch] AzureError while deleting documents from '{index_name}': {e}"
+            )
         except Exception as e:
-            logging.error(f"[aisearch] Unexpected error while deleting documents from '{index_name}': {e}")
+            logging.error(
+                f"[aisearch] Unexpected error while deleting documents from '{index_name}': {e}"
+            )
 
     async def search_documents(
         self,
@@ -172,7 +219,7 @@ class AISearchClient:
         top: int = 10,
         skip: int = 0,
         order_by: Optional[str] = None,
-        filter_str: Optional[str] = None
+        filter_str: Optional[str] = None,
     ) -> Dict[str, Any]:
         client = await self.get_search_client(index_name)
         try:
@@ -189,7 +236,7 @@ class AISearchClient:
                 "filter": filter_str,
                 "order_by": order_by,
                 "search_mode": SearchMode.ALL,
-                "skip": skip
+                "skip": skip,
             }
 
             if select_fields:
@@ -207,17 +254,55 @@ class AISearchClient:
                 if top > 0 and len(documents) >= top:
                     break
 
-            return {
-                "count": len(documents),
-                "documents": documents
-            }
+            return {"count": len(documents), "documents": documents}
 
         except AzureError as e:
-            logging.error(f"[aisearch] AzureError while searching documents in '{index_name}': {e}")
+            logging.error(
+                f"[aisearch] AzureError while searching documents in '{index_name}': {e}"
+            )
             return {"count": 0, "documents": [], "error": str(e)}
         except Exception as e:
-            logging.error(f"[aisearch] Unexpected error while searching documents in '{index_name}': {e}")
+            logging.error(
+                f"[aisearch] Unexpected error while searching documents in '{index_name}': {e}"
+            )
             return {"count": 0, "documents": [], "error": str(e)}
+
+    async def ensure_index(self, index: SearchIndex) -> None:
+        """Creates or updates the index schema. Safe to call on every ingest run."""
+        async with SearchIndexClient(
+            endpoint=self.endpoint, credential=self.credential
+        ) as idx_client:
+            await idx_client.create_or_update_index(index)
+            logging.info(f"[aisearch] Index '{index.name}' ensured.")
+
+    async def upload_documents_batch(
+        self, index_name: str, documents: list[dict], batch_size: int = 1000
+    ) -> int:
+        """
+        Uploads documents to the specified index in batches. Returns total succeeded count.
+        """
+        client = await self.get_search_client(index_name)
+        total_succeeded = 0
+        for i in range(0, len(documents), batch_size):
+            batch = documents[i : i + batch_size]
+            try:
+                results = await client.upload_documents(documents=batch)
+                succeeded = sum(1 for r in results if r.succeeded)
+                failed = len(batch) - succeeded
+                total_succeeded += succeeded
+                if failed:
+                    logging.warning(
+                        f"[aisearch] {failed} document(s) failed to upload to '{index_name}'"
+                    )
+            except AzureError as e:
+                logging.error(
+                    f"[aisearch] AzureError uploading batch to '{index_name}': {e}"
+                )
+            except Exception as e:
+                logging.error(
+                    f"[aisearch] Unexpected error uploading batch to '{index_name}': {e}"
+                )
+        return total_succeeded
 
     async def run_indexer(self, indexer_name: str) -> None:
         """
@@ -231,9 +316,13 @@ class AISearchClient:
             await client.run_indexer(indexer_name)
             logging.info(f"[aisearch] Ran indexer '{indexer_name}'.")
         except AzureError as e:
-            logging.error(f"[aisearch] AzureError while running indexer '{indexer_name}': {e}")
+            logging.error(
+                f"[aisearch] AzureError while running indexer '{indexer_name}': {e}"
+            )
         except Exception as e:
-            logging.error(f"[aisearch] Unexpected error while running indexer '{indexer_name}': {e}")
+            logging.error(
+                f"[aisearch] Unexpected error while running indexer '{indexer_name}': {e}"
+            )
 
     async def close(self):
         """

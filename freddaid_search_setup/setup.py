@@ -100,11 +100,15 @@ def setup_search_indexing(
 
 if __name__ == "__main__":
     index_name = "ragindex-multimodal"  # name of the search index
-    datasource_name = "ragindex-multimodal-datasource"  # name of the datasource (in Azure Search)
+    datasource_name = (
+        "ragindex-multimodal-datasource"  # name of the datasource (in Azure Search)
+    )
     container_name = (
         "documents"  # name of the storage container (in Azure Blob Storage)
     )
-    indexer_name = "ragindex-multimodal-indexer"  # name of the indexer we want to create
+    indexer_name = (
+        "ragindex-multimodal-indexer"  # name of the indexer we want to create
+    )
 
     setup_search_indexing(
         search_service_name=search_service_name,

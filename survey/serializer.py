@@ -23,7 +23,7 @@ async def summarize_grouped_data(
     parent_category: str,
     column: str,
     data: Dict[str, Dict[str, float]],
-    model: str = "gpt-4.1-nano"
+    model: str = "gpt-4.1-nano",
 ) -> str:
     """Generate prose from column-grouped data."""
     data_str = records_to_string(data)
@@ -84,7 +84,7 @@ async def process_grouped_record_in_memory(
     output: Any,
     lock: asyncio.Lock,
     model: str = "gpt-4.1-nano",
-    filename: str = ""
+    filename: str = "",
 ) -> None:
     """Process a single grouped record and append result to StringIO buffer."""
     section = record["section"]
@@ -109,7 +109,7 @@ async def process_grouped_record_in_memory(
     except Exception as e:
         logger.error(
             f"[{filename}] Error processing {parent_category} - {column_display}: {e}",
-            exc_info=True
+            exc_info=True,
         )
 
 
@@ -118,7 +118,7 @@ async def process_grouped_record(
     record: Dict[str, Any],
     output_file: str,
     lock: asyncio.Lock,
-    model: str = "gpt-4.1-nano"
+    model: str = "gpt-4.1-nano",
 ) -> None:
     """Process a single grouped record and append result to file."""
     section = record["section"]
@@ -143,8 +143,7 @@ async def process_grouped_record(
         logger.info(f"Completed: {parent_category} - {column_display}")
     except Exception as e:
         logger.error(
-            f"Error processing {parent_category} - {column_display}: {e}",
-            exc_info=True
+            f"Error processing {parent_category} - {column_display}: {e}", exc_info=True
         )
 
 
@@ -152,7 +151,7 @@ async def process_json_to_markdown_in_memory(
     grouped_records: List[Dict[str, Any]],
     filename: str,
     model: str = "gpt-4.1-nano",
-    max_concurrent: int = 5
+    max_concurrent: int = 5,
 ) -> str:
     """Process grouped JSON data in memory and return markdown string.
 
@@ -169,7 +168,9 @@ async def process_json_to_markdown_in_memory(
     logger.info(f"[{filename}] Processing {len(grouped_records)} grouped records")
 
     # Initialize markdown content with header
-    section = grouped_records[0].get("section", "Unknown") if grouped_records else "Unknown"
+    section = (
+        grouped_records[0].get("section", "Unknown") if grouped_records else "Unknown"
+    )
     output = StringIO()
     output.write(f"# {section} Analysis\n\n")
 
@@ -179,7 +180,9 @@ async def process_json_to_markdown_in_memory(
 
     async def limited_process(record: Dict[str, Any]):
         async with semaphore:
-            await process_grouped_record_in_memory(client, record, output, lock, model, filename)
+            await process_grouped_record_in_memory(
+                client, record, output, lock, model, filename
+            )
 
     tasks = [limited_process(record) for record in grouped_records]
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -211,7 +214,7 @@ async def process_json_to_markdown(
     input_json_path: str,
     output_md_path: str,
     model: str = "gpt-4.1-nano",
-    max_concurrent: int = 5
+    max_concurrent: int = 5,
 ) -> None:
     """Main processing function. Expects pre-grouped JSON from excel_serializer.group_by_column()."""
     start_time = time.time()
@@ -222,7 +225,9 @@ async def process_json_to_markdown(
     logger.info(f"Loaded {len(grouped_records)} grouped records")
 
     # Initialize output file with header
-    section = grouped_records[0].get("section", "Unknown") if grouped_records else "Unknown"
+    section = (
+        grouped_records[0].get("section", "Unknown") if grouped_records else "Unknown"
+    )
     with open(output_md_path, "w", encoding="utf-8") as f:
         f.write(f"# {section} Analysis\n\n")
 
@@ -251,12 +256,14 @@ async def process_json_to_markdown(
 
 def main():
     """Entry point for command line usage."""
-    asyncio.run(process_json_to_markdown(
-        "subsection.json",  # Pre-grouped JSON from excel_serializer.group_by_column()
-        "water_consideration.md",
-        "gpt-4.1-mini",
-        20
-    ))
+    asyncio.run(
+        process_json_to_markdown(
+            "subsection.json",  # Pre-grouped JSON from excel_serializer.group_by_column()
+            "water_consideration.md",
+            "gpt-4.1-mini",
+            20,
+        )
+    )
 
 
 if __name__ == "__main__":
