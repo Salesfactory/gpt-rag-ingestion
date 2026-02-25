@@ -101,7 +101,6 @@ class AzureOpenAIClient:
             )
             raise
 
-
     def get_embeddings(self, text, retry_after=True):
         """
         Generates embeddings for the given text using the Azure OpenAI service.

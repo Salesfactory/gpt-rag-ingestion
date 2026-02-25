@@ -8,7 +8,6 @@ from tools.blob import BlobStorageClient
 from datetime import datetime, timezone
 
 
-
 class BaseChunker:
     """
     BaseChunker class serves as an abstract base class for implementing chunking strategies
@@ -237,7 +236,7 @@ class BaseChunker:
             return False
 
         try:
-            parsed_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            parsed_date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
             return parsed_date.tzinfo is not None
         except (ValueError, AttributeError):
             return False
@@ -283,7 +282,9 @@ class BaseChunker:
             logging.warning(
                 f"[base_chunker][{self.filename}] Error retrieving date: {e}. Using current time."
             )
-            return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+            return (
+                datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+            )
 
     def _extract_title_from_filename(self, filename):
         """
