@@ -7,7 +7,7 @@ from function_app import document_chunking
 @pytest.mark.asyncio
 async def test_api_schema_error():
     """Test that the API returns 400 for schema validation errors."""
-    
+
     # Create a mock request with invalid JSON body (missing required fields)
     req = Mock(spec=func.HttpRequest)
     req.get_json.return_value = {
@@ -16,45 +16,48 @@ async def test_api_schema_error():
             "documentUrl": "https://example.com/test-document.txt",
         }
     }
-    
+
     # Call the async function
     response = await document_chunking(req)
-    
+
     # Check the response
     assert response.status_code == 400
 
 
-@pytest.mark.asyncio 
+@pytest.mark.asyncio
 async def test_api_valid_request():
     """Test that the API processes valid requests correctly."""
-    
+
     # Create a mock request with valid JSON body
     req = Mock(spec=func.HttpRequest)
     req.get_json.return_value = {
-        "values": [{
-            "recordId": "1",
-            "data": {
-                "documentUrl": "https://example.com/test.pdf",
-                "documentContentType": "application/pdf",
-                "documentSasToken": ""
+        "values": [
+            {
+                "recordId": "1",
+                "data": {
+                    "documentUrl": "https://example.com/test.pdf",
+                    "documentContentType": "application/pdf",
+                    "documentSasToken": "",
+                },
             }
-        }]
+        ]
     }
-    
+
     # Mock dependencies
-    with patch('function_app.BlobStorageClient') as mock_blob_client, \
-         patch('function_app.DocumentChunker') as mock_chunker:
-        
+    with patch("function_app.BlobStorageClient") as mock_blob_client, patch(
+        "function_app.DocumentChunker"
+    ) as mock_chunker:
+
         # Setup mocks
         mock_blob_instance = mock_blob_client.return_value
         mock_blob_instance.download_blob.return_value = b"test content"
-        
+
         mock_chunker_instance = mock_chunker.return_value
         mock_chunker_instance.chunk_documents = AsyncMock(return_value=([], [], []))
-        
+
         # Call the async function
         response = await document_chunking(req)
-        
+
         # Check the response
         assert response.status_code == 200
 
@@ -81,18 +84,21 @@ async def test_api_missing_content_type_inference():
     # Create a mock request WITHOUT documentContentType
     req = Mock(spec=func.HttpRequest)
     req.get_json.return_value = {
-        "values": [{
-            "recordId": "1",
-            "data": {
-                "documentUrl": "https://example.com/test.txt",
-                "documentSasToken": ""
+        "values": [
+            {
+                "recordId": "1",
+                "data": {
+                    "documentUrl": "https://example.com/test.txt",
+                    "documentSasToken": "",
+                },
             }
-        }]
+        ]
     }
 
     # Mock dependencies
-    with patch('function_app.BlobStorageClient') as mock_blob_client, \
-         patch('function_app.DocumentChunker') as mock_chunker:
+    with patch("function_app.BlobStorageClient") as mock_blob_client, patch(
+        "function_app.DocumentChunker"
+    ) as mock_chunker:
 
         # Setup mocks
         mock_blob_instance = mock_blob_client.return_value
@@ -119,19 +125,22 @@ async def test_api_octet_stream_override():
     # Create a mock request with generic content type
     req = Mock(spec=func.HttpRequest)
     req.get_json.return_value = {
-        "values": [{
-            "recordId": "1",
-            "data": {
-                "documentUrl": "https://example.com/document.pdf",
-                "documentContentType": "application/octet-stream",
-                "documentSasToken": ""
+        "values": [
+            {
+                "recordId": "1",
+                "data": {
+                    "documentUrl": "https://example.com/document.pdf",
+                    "documentContentType": "application/octet-stream",
+                    "documentSasToken": "",
+                },
             }
-        }]
+        ]
     }
 
     # Mock dependencies
-    with patch('function_app.BlobStorageClient') as mock_blob_client, \
-         patch('function_app.DocumentChunker') as mock_chunker:
+    with patch("function_app.BlobStorageClient") as mock_blob_client, patch(
+        "function_app.DocumentChunker"
+    ) as mock_chunker:
 
         # Setup mocks
         mock_blob_instance = mock_blob_client.return_value
@@ -158,19 +167,22 @@ async def test_api_preserves_valid_content_type():
     # Create a mock request with proper content type
     req = Mock(spec=func.HttpRequest)
     req.get_json.return_value = {
-        "values": [{
-            "recordId": "1",
-            "data": {
-                "documentUrl": "https://example.com/test.pdf",
-                "documentContentType": "application/pdf",
-                "documentSasToken": ""
+        "values": [
+            {
+                "recordId": "1",
+                "data": {
+                    "documentUrl": "https://example.com/test.pdf",
+                    "documentContentType": "application/pdf",
+                    "documentSasToken": "",
+                },
             }
-        }]
+        ]
     }
 
     # Mock dependencies
-    with patch('function_app.BlobStorageClient') as mock_blob_client, \
-         patch('function_app.DocumentChunker') as mock_chunker:
+    with patch("function_app.BlobStorageClient") as mock_blob_client, patch(
+        "function_app.DocumentChunker"
+    ) as mock_chunker:
 
         # Setup mocks
         mock_blob_instance = mock_blob_client.return_value

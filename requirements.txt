@@ -31,3 +31,12 @@ pytest-asyncio
 azure-ai-documentintelligence==1.0.0b4
 Pillow
 PyMuPDF
+
+# Google Drive API dependencies
+google-api-python-client
+google-auth-httplib2
+google-auth
+
+# Survey data parsing
+pandas
+openpyxl
